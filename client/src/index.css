@@ -1,0 +1,427 @@
+@import "tailwindcss";
+
+@theme {
+  /* =========================================================================
+     Palette: lavender_blush, thistle, lilac_ash, dusty_mauve, space_indigo
+     Both hyphenated and underscored formats supported for Tailwind utilities
+     ========================================================================= */
+
+  /* Lavender Blush Palette */
+  --color-lavender-blush: #f5e6e8;
+  --color-lavender-blush-100: #441b20;
+  --color-lavender-blush-200: #883641;
+  --color-lavender-blush-300: #bf5e6b;
+  --color-lavender-blush-400: #daa2a9;
+  --color-lavender-blush-500: #f5e6e8;
+  --color-lavender-blush-600: #f7ebec;
+  --color-lavender-blush-700: #f9f0f1;
+  --color-lavender-blush-800: #fbf5f6;
+  --color-lavender-blush-900: #fdfafa;
+
+  --color-lavender_blush: #f5e6e8;
+  --color-lavender_blush-100: #441b20;
+  --color-lavender_blush-200: #883641;
+  --color-lavender_blush-300: #bf5e6b;
+  --color-lavender_blush-400: #daa2a9;
+  --color-lavender_blush-500: #f5e6e8;
+  --color-lavender_blush-600: #f7ebec;
+  --color-lavender_blush-700: #f9f0f1;
+  --color-lavender_blush-800: #fbf5f6;
+  --color-lavender_blush-900: #fdfafa;
+
+  /* Thistle Palette */
+  --color-thistle: #d5c6e0;
+  --color-thistle-100: #2c1e37;
+  --color-thistle-200: #593b6e;
+  --color-thistle-300: #8559a5;
+  --color-thistle-400: #ae90c3;
+  --color-thistle-500: #d5c6e0;
+  --color-thistle-600: #ded2e7;
+  --color-thistle-700: #e6dded;
+  --color-thistle-800: #efe8f3;
+  --color-thistle-900: #f7f4f9;
+
+  /* Lilac Ash Palette */
+  --color-lilac-ash: #aaa1c8;
+  --color-lilac-ash-100: #1f1b2e;
+  --color-lilac-ash-200: #3e365b;
+  --color-lilac-ash-300: #5e5089;
+  --color-lilac-ash-400: #8274ad;
+  --color-lilac-ash-500: #aaa1c8;
+  --color-lilac-ash-600: #bcb4d3;
+  --color-lilac-ash-700: #ccc7de;
+  --color-lilac-ash-800: #dddae9;
+  --color-lilac-ash-900: #eeecf4;
+
+  --color-lilac_ash: #aaa1c8;
+  --color-lilac_ash-100: #1f1b2e;
+  --color-lilac_ash-200: #3e365b;
+  --color-lilac_ash-300: #5e5089;
+  --color-lilac_ash-400: #8274ad;
+  --color-lilac_ash-500: #aaa1c8;
+  --color-lilac_ash-600: #bcb4d3;
+  --color-lilac_ash-700: #ccc7de;
+  --color-lilac_ash-800: #dddae9;
+  --color-lilac_ash-900: #eeecf4;
+
+  /* Dusty Mauve Palette */
+  --color-dusty-mauve: #967aa1;
+  --color-dusty-mauve-100: #1e1721;
+  --color-dusty-mauve-200: #3c2f42;
+  --color-dusty-mauve-300: #5a4662;
+  --color-dusty-mauve-400: #785d83;
+  --color-dusty-mauve-500: #967aa1;
+  --color-dusty-mauve-600: #aa94b3;
+  --color-dusty-mauve-700: #bfaec6;
+  --color-dusty-mauve-800: #d4c9d9;
+  --color-dusty-mauve-900: #eae4ec;
+
+  --color-dusty_mauve: #967aa1;
+  --color-dusty_mauve-100: #1e1721;
+  --color-dusty_mauve-200: #3c2f42;
+  --color-dusty_mauve-300: #5a4662;
+  --color-dusty_mauve-400: #785d83;
+  --color-dusty_mauve-500: #967aa1;
+  --color-dusty_mauve-600: #aa94b3;
+  --color-dusty_mauve-700: #bfaec6;
+  --color-dusty_mauve-800: #d4c9d9;
+  --color-dusty_mauve-900: #eae4ec;
+
+  /* Space Indigo Palette */
+  --color-space-indigo: #192a51;
+  --color-space-indigo-100: #050810;
+  --color-space-indigo-200: #0a1121;
+  --color-space-indigo-300: #0f1931;
+  --color-space-indigo-400: #142242;
+  --color-space-indigo-500: #192a51;
+  --color-space-indigo-600: #2c4a90;
+  --color-space-indigo-700: #466dc6;
+  --color-space-indigo-800: #849dd9;
+  --color-space-indigo-900: #c1ceec;
+
+  --color-space_indigo: #192a51;
+  --color-space_indigo-100: #050810;
+  --color-space_indigo-200: #0a1121;
+  --color-space_indigo-300: #0f1931;
+  --color-space_indigo-400: #142242;
+  --color-space_indigo-500: #192a51;
+  --color-space_indigo-600: #2c4a90;
+  --color-space_indigo-700: #466dc6;
+  --color-space_indigo-800: #849dd9;
+  --color-space_indigo-900: #c1ceec;
+
+  /* =========================================================================
+     Backward Compatibility Mappings (gracefully redirects legacy color classes)
+     ========================================================================= */
+  --color-powder-blush: #967aa1;
+  --color-powder-blush-100: #1e1721;
+  --color-powder-blush-200: #3c2f42;
+  --color-powder-blush-300: #5a4662;
+  --color-powder-blush-400: #785d83;
+  --color-powder-blush-500: #967aa1;
+  --color-powder-blush-600: #aa94b3;
+  --color-powder-blush-700: #bfaec6;
+  --color-powder-blush-800: #d4c9d9;
+  --color-powder-blush-900: #f5e6e8;
+
+  --color-powder_blush: #967aa1;
+  --color-powder_blush-100: #1e1721;
+  --color-powder_blush-200: #3c2f42;
+  --color-powder_blush-300: #5a4662;
+  --color-powder_blush-400: #785d83;
+  --color-powder_blush-500: #967aa1;
+  --color-powder_blush-600: #aa94b3;
+  --color-powder_blush-700: #bfaec6;
+  --color-powder_blush-800: #d4c9d9;
+  --color-powder_blush-900: #f5e6e8;
+
+  --color-eggshell: #f5e6e8;
+  --color-eggshell-100: #441b20;
+  --color-eggshell-200: #883641;
+  --color-eggshell-300: #daa2a9;
+  --color-eggshell-400: #ded2e7;
+  --color-eggshell-500: #efe8f3;
+  --color-eggshell-600: #f7ebec;
+  --color-eggshell-700: #f9f0f1;
+  --color-eggshell-800: #fbf5f6;
+  --color-eggshell-900: #fdfafa;
+
+  --color-icy-aqua: #aaa1c8;
+  --color-icy-aqua-100: #1f1b2e;
+  --color-icy-aqua-200: #3e365b;
+  --color-icy-aqua-300: #5e5089;
+  --color-icy-aqua-400: #8274ad;
+  --color-icy-aqua-500: #aaa1c8;
+  --color-icy-aqua-600: #bcb4d3;
+  --color-icy-aqua-700: #ccc7de;
+  --color-icy-aqua-800: #dddae9;
+  --color-icy-aqua-900: #eeecf4;
+
+  --color-icy_aqua: #aaa1c8;
+  --color-icy_aqua-100: #1f1b2e;
+  --color-icy_aqua-200: #3e365b;
+  --color-icy_aqua-300: #5e5089;
+  --color-icy_aqua-400: #8274ad;
+  --color-icy_aqua-500: #aaa1c8;
+  --color-icy_aqua-600: #bcb4d3;
+  --color-icy_aqua-700: #ccc7de;
+  --color-icy_aqua-800: #dddae9;
+  --color-icy_aqua-900: #eeecf4;
+
+  --color-light-blue: #d5c6e0;
+  --color-light-blue-100: #2c1e37;
+  --color-light-blue-200: #593b6e;
+  --color-light-blue-300: #8559a5;
+  --color-light-blue-400: #ae90c3;
+  --color-light-blue-500: #d5c6e0;
+  --color-light-blue-600: #ded2e7;
+  --color-light-blue-700: #e6dded;
+  --color-light-blue-800: #efe8f3;
+  --color-light-blue-900: #f7f4f9;
+
+  --color-light_blue: #d5c6e0;
+  --color-light_blue-100: #2c1e37;
+  --color-light_blue-200: #593b6e;
+  --color-light_blue-300: #8559a5;
+  --color-light_blue-400: #ae90c3;
+  --color-light_blue-500: #d5c6e0;
+  --color-light_blue-600: #ded2e7;
+  --color-light_blue-700: #e6dded;
+  --color-light_blue-800: #efe8f3;
+  --color-light_blue-900: #f7f4f9;
+
+  --color-blue-slate: #192a51;
+  --color-blue-slate-100: #050810;
+  --color-blue-slate-200: #0a1121;
+  --color-blue-slate-300: #0f1931;
+  --color-blue-slate-400: #142242;
+  --color-blue-slate-500: #192a51;
+  --color-blue-slate-600: #2c4a90;
+  --color-blue-slate-700: #466dc6;
+  --color-blue-slate-800: #849dd9;
+  --color-blue-slate-900: #c1ceec;
+
+  --color-blue_slate: #192a51;
+  --color-blue_slate-100: #050810;
+  --color-blue_slate-200: #0a1121;
+  --color-blue_slate-300: #0f1931;
+  --color-blue_slate-400: #142242;
+  --color-blue_slate-500: #192a51;
+  --color-blue_slate-600: #2c4a90;
+  --color-blue_slate-700: #466dc6;
+  --color-blue_slate-800: #849dd9;
+  --color-blue_slate-900: #c1ceec;
+
+  /* =========================================================================
+     3 Required Typefaces: Tenez, Futura, Aleo
+     ========================================================================= */
+  --font-tenez: 'Tenez', 'DM Serif Display', 'Playfair Display', Didot, 'Bodoni MT', Georgia, serif;
+  --font-futura: 'Futura', 'Futura-Medium', 'Jost', 'Montserrat', 'Century Gothic', -apple-system, sans-serif;
+  --font-aleo: 'Aleo', 'Rockwell', 'Calisto MT', Georgia, serif;
+
+  --font-heading: var(--font-tenez);
+  --font-sans: var(--font-futura);
+  --font-body: var(--font-aleo);
+
+  /* Harmonized Semantic Overrides */
+  --color-orange-50: #fdfafa;
+  --color-orange-100: #f7ebec;
+  --color-orange-200: #daa2a9;
+  --color-orange-300: #bf5e6b;
+  --color-orange-400: #967aa1;
+  --color-orange-500: #192a51;
+  --color-orange-600: #0f1931;
+  --color-orange-700: #883641;
+  --color-orange-800: #441b20;
+  --color-orange-900: #050810;
+
+  --color-slate-50: #fdfafa;
+  --color-slate-100: #f7f4f9;
+  --color-slate-200: #eeecf4;
+  --color-slate-300: #dddae9;
+  --color-slate-400: #aaa1c8;
+  --color-slate-500: #785d83;
+  --color-slate-600: #5a4662;
+  --color-slate-700: #192a51;
+  --color-slate-800: #0f1931;
+  --color-slate-900: #050810;
+}
+
+@layer base {
+  :root {
+    --primary: #192a51;
+    --primary-hover: #0f1931;
+    --primary-light: #f5e6e8;
+    --secondary: #967aa1;
+    --accent: #aaa1c8;
+    --dark: #050810;
+    --card-bg: #fdfafa;
+    --border: #ded2e7;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-futura);
+    color: #050810;
+    background-color: #fdfafa;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+
+  /* Typeface utility defaults */
+  h1, h2 {
+    font-family: var(--font-tenez);
+    letter-spacing: -0.02em;
+  }
+
+  h3, h4, h5, h6 {
+    font-family: var(--font-aleo);
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Custom scrollbar styled with thistle & lilac ash */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f7ebec;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #aaa1c8;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #967aa1;
+}
+
+/* Glassmorphism utility with lavender blush & space indigo */
+.glass {
+  background: rgba(253, 250, 250, 0.90);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.glass-dark {
+  background: rgba(5, 8, 16, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* Typeface Utility Classes */
+.font-tenez {
+  font-family: var(--font-tenez);
+}
+
+.font-futura {
+  font-family: var(--font-futura);
+}
+
+.font-aleo {
+  font-family: var(--font-aleo);
+}
+
+/* Pulse animation for live indicators */
+@keyframes softPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.85;
+  }
+}
+
+.animate-soft-pulse {
+  animation: softPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Shiny metallic sweep across typography */
+@keyframes shinySweep {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+.animate-shiny {
+  background-size: 200% auto;
+  animation: shinySweep 4s linear infinite;
+}
+
+/* Gentle floating animation for cards and decorative elements */
+@keyframes floatGently {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.4deg);
+  }
+}
+
+.animate-float {
+  animation: floatGently 6s ease-in-out infinite;
+}
+
+/* 3D Perspective Preservation & GPU Acceleration */
+.preserve-3d {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+/* Lenis Smooth Scroll Configuration */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Print styling for QR code standees */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only, .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
