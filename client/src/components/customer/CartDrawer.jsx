@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
 import { formatINR } from '../../utils/formatters';
 import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
-import CreativeButton from '../animations/CreativeButton';
 
 const CartDrawer = ({ isOpen, onClose, onProceedToPayment }) => {
   const {
@@ -200,26 +199,20 @@ const CartDrawer = ({ isOpen, onClose, onProceedToPayment }) => {
               </div>
             </div>
 
-            {/* Proceed to checkout CTA with CreativeButton */}
-            <CreativeButton
+            {/* Proceed to checkout */}
+            <button
               type="button"
               onClick={onProceedToPayment}
-              variant="primary"
-              size="lg"
-              magnetic={true}
-              spark={true}
-              sparkColor="#aaa1c8"
-              sound={true}
-              soundType="newOrder"
-              className="guest-place-order w-full shadow-xl shadow-space_indigo/30"
+              className="guest-place-order"
+              aria-label={`Review and place order for ${formatINR(totalAmount)}`}
             >
               <span className="flex items-center justify-between w-full">
                 <span>Review & Place Order</span>
-                <span className="bg-white/20 backdrop-blur-xs px-2.5 py-0.5 rounded-lg text-xs font-black">
+                <span className="bg-[#ffd3c7] px-2.5 py-0.5 rounded-lg text-xs font-black text-[#2f4a3a]">
                   {formatINR(totalAmount)}
                 </span>
               </span>
-            </CreativeButton>
+            </button>
           </div>
         )}
       </div>

@@ -26,10 +26,15 @@ const startServer = async () => {
   // Make io accessible in routes via req.app.get('io')
   app.set('io', io);
 
+  server.on('error', (error) => {
+    console.error('Server error:', error);
+    process.exit(1);
+  });
+
   server.listen(config.port, () => {
-    console.log(`\n🚀 Smart Café Server running on port ${config.port}`);
+    console.log(`\n🚀 Smart Café Server running on port ${server.address().port}`);
     console.log(`   Environment: ${config.nodeEnv}`);
-    console.log(`   API: http://localhost:${config.port}/api`);
+    console.log(`   API: http://localhost:${server.address().port}/api`);
     console.log(`   Client: ${config.clientUrl}\n`);
   });
 };

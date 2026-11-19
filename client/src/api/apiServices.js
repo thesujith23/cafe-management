@@ -1,4 +1,4 @@
-import api from './axios';
+
 
 // Auth API
 export const authApi = {
@@ -21,6 +21,7 @@ export const menuApi = {
 // Table API
 export const tableApi = {
   getTables: () => api.get('/tables'),
+  getTablesManage: () => api.get('/tables/manage'),
   getTable: (id) => api.get(`/tables/${id}`),
   validateToken: (token) => api.get(`/tables/token/${token}`),
   generateQR: (id) => api.post(`/tables/${id}/qr`),
@@ -41,8 +42,8 @@ export const orderApi = {
     api.patch(`/orders/${id}/status`, { status, cancellationReason }),
   toggleOrderItem: (id, itemId, isDone) =>
     api.patch(`/orders/${id}/items/${itemId}`, { isDone }),
-  cancelOrder: (id, reason, isStaffOverride = false) =>
-    api.patch(`/orders/${id}/cancel`, { reason, isStaffOverride }),
+  cancelOrder: (id, reason, tableToken) =>
+    api.patch(`/orders/${id}/cancel`, { reason, tableToken }),
   clearOrder: (id) => api.delete(`/orders/${id}`),
   getKitchenOrders: () => api.get('/orders/kitchen'),
   getDisplayOrders: () => api.get('/orders/display'),
@@ -53,7 +54,7 @@ export const orderApi = {
 // Payment API
 export const paymentApi = {
   getPaymentKey: () => api.get('/payments/key'),
-  createPaymentOrder: (orderId) => api.post(`/payments/create/${orderId}`),
+  createPaymentOrder: (orderId, tableToken) => api.post(`/payments/create/${orderId}`, { tableToken }),
   verifyPayment: (paymentDetails) => api.post('/payments/verify', paymentDetails),
 };
 
@@ -61,4 +62,11 @@ export const paymentApi = {
 export const settingsApi = {
   getSettings: () => api.get('/settings'),
   updateSettings: (data) => api.put('/settings', data),
+};
+
+// Chatbot API
+import api from './axios';
+
+export const chatBotApi = {
+  sendMessage: (message) => api.post('/chat', { message }),
 };

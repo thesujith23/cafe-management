@@ -6,6 +6,12 @@ import OrderStatusHistory from '../models/OrderStatusHistory.js';
 import DiningTable from '../models/DiningTable.js';
 import { withProgress, withProgressList, loadOrderTimeline } from '../services/progressService.js';
 import { fallbackMenuItems } from './menuController.js';
+import { isDemoToken, demoTableFor } from '../middleware/validateQR.js';
+import { publicOrderView } from '../utils/publicOrder.js';
+import { recordAudit } from '../utils/audit.js';
+
+// User input must never be compiled into a regular expression as-is.
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // @desc    Create a new order (called after cart submission, before payment)
 // @route   POST /api/orders
@@ -14,8 +20,11 @@ export const createOrder = async (req, res, next) => {
     const { items, customerNotes } = req.body;
     const table = req.table; // Set by validateQR middleware
 
-    if (!items || !items.length) {
+    if (!Array.isArray(items) || !items.length) {
       return res.status(400).json({ success: false, message: 'Order must have at least one item' });
+    }
+    if (items.length > 30) {
+      return res.status(400).json({ success: false, message: 'An order can hold at most 30 dishes' });
     }
 
     const settings = await CafeSettings.getSettings();
@@ -48,7 +57,7 @@ export const createOrder = async (req, res, next) => {
       // 2. If not found or ID is string like 'item_1', search by name in DB
       if (!menuItem && cartItem.name && mongoose.connection.readyState === 1) {
         menuItem = await MenuItem.findOne({
-          name: new RegExp(`^${cartItem.name.trim()}$`, 'i'),
+          name: { $regex: `^${escapeRegExp(cartItem.name.trim())}$`, $options: 'i' },
           isArchived: false,
         });
       }
@@ -62,7 +71,7 @@ export const createOrder = async (req, res, next) => {
           // If DB is connected, find the seeded DB item with matching name
           if (mongoose.connection.readyState === 1) {
             menuItem = await MenuItem.findOne({
-              name: new RegExp(`^${fallback.name.trim()}$`, 'i'),
+              name: { $regex: `^${escapeRegExp(fallback.name.trim())}$`, $options: 'i' },
               isArchived: false,
             });
           }
@@ -125,7 +134,7 @@ export const createOrder = async (req, res, next) => {
         }
       }
 
-      const quantity = Math.max(1, Math.floor(cartItem.quantity || 1));
+      const quantity = Math.min(20, Math.max(1, Math.floor(Number(cartItem.quantity) || 1)));
       const itemTotal = (unitPrice + addonTotal) * quantity;
 
       // Apply item-level discount
@@ -274,10 +283,8 @@ export const getOrdersByToken = async (req, res, next) => {
     const token = req.params.token;
     let tableId = null;
 
-    if (token && token.startsWith('demo-token-TBL-')) {
-      const numStr = token.replace('demo-token-TBL-00', '').replace('demo-token-TBL-0', '');
-      const num = parseInt(numStr, 10) || 1;
-      const realTable = await DiningTable.findOne({ tableId: `TBL-00${num}` });
+    if (isDemoToken(token)) {
+      const realTable = await DiningTable.findOne({ tableId: demoTableFor(token).tableId });
       tableId = realTable?._id;
     } else {
       const QRToken = (await import('../models/QRToken.js')).default;
@@ -296,7 +303,7 @@ export const getOrdersByToken = async (req, res, next) => {
       .populate('table', 'tableId displayName')
       .sort({ createdAt: -1 });
 
-    const payload = withProgressList(orders);
+    const payload = withProgressList(orders).map(publicOrderView);
     res.json({ success: true, data: payload, orders: payload });
   } catch (error) {
     next(error);
@@ -368,7 +375,10 @@ export const updateOrderStatus = async (req, res, next) => {
     // Validate status transitions
     const validTransitions = {
       waiting_payment: ['new', 'cancelled'],
-      new: ['accepted', 'preparing', 'cancelled'],
+      // A paid ticket waits at the counter. Nothing reaches the kitchen until someone
+      // there has read the table and the dishes and confirmed the ticket.
+      new: ['confirmed', 'cancelled'],
+      confirmed: ['accepted', 'preparing', 'cancelled'],
       accepted: ['preparing', 'cancelled'],
       preparing: ['ready', 'cancelled'],
       // 'preparing' here is the kitchen recalling a ticket it bumped by mistake.
@@ -389,6 +399,7 @@ export const updateOrderStatus = async (req, res, next) => {
     order.preparationStatus = targetStatus;
 
     // Set timestamps
+    if (targetStatus === 'confirmed') order.confirmedAt = new Date();
     if (targetStatus === 'accepted') order.acceptedAt = new Date();
     if (targetStatus === 'preparing') {
       // Also covers a recall from ready: the dish is back in the pan, so the clock restarts
@@ -441,8 +452,13 @@ export const updateOrderStatus = async (req, res, next) => {
         order: updatedOrder,
       };
 
-      io.to('kitchen').emit('order:statusUpdate', updatedOrder);
-      io.to('kitchen').emit('order:status:changed', payload);
+      // The kitchen only hears about tickets the counter has confirmed. Confirming is
+      // also the moment the ticket first appears there, so it is sent as a new ticket.
+      if (targetStatus !== 'new' && targetStatus !== 'waiting_payment') {
+        io.to('kitchen').emit('order:statusUpdate', updatedOrder);
+        io.to('kitchen').emit('order:status:changed', payload);
+        if (targetStatus === 'confirmed') io.to('kitchen').emit('order:new', updatedOrder);
+      }
 
       io.to('admin').emit('order:statusUpdate', updatedOrder);
       io.to('admin').emit('order:status:changed', payload);
@@ -453,6 +469,12 @@ export const updateOrderStatus = async (req, res, next) => {
       io.to(`order:${order._id}`).emit('order:statusUpdate', updatedOrder);
       io.to(`order:${order._id}`).emit('order:status:changed', payload);
     }
+
+    recordAudit(req, 'order_status_changed', {
+      targetModel: 'Order',
+      targetId: order._id,
+      details: { from: fromStatus, to: targetStatus, role: req.user?.role },
+    });
 
     res.json({ success: true, data: updatedOrder, order: updatedOrder });
   } catch (error) {
@@ -471,7 +493,7 @@ export const updateOrderItem = async (req, res, next) => {
 
     const order = await Order.findById(id);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
-    if (!['new', 'accepted', 'preparing', 'ready'].includes(order.preparationStatus)) {
+    if (!['confirmed', 'accepted', 'preparing', 'ready'].includes(order.preparationStatus)) {
       return res.status(400).json({ success: false, message: 'This order is closed — its dishes cannot change.' });
     }
 
@@ -494,6 +516,12 @@ export const updateOrderItem = async (req, res, next) => {
       }
     }
 
+    recordAudit(req, 'order_item_toggled', {
+      targetModel: 'Order',
+      targetId: order._id,
+      details: { item: item.name, isDone },
+    });
+
     res.json({ success: true, data: updatedOrder, order: updatedOrder });
   } catch (error) {
     next(error);
@@ -510,7 +538,8 @@ export const getKitchenOrders = async (req, res, next) => {
   try {
     const orders = await Order.find({
       paymentStatus: 'paid',
-      preparationStatus: { $in: ['new', 'accepted', 'preparing', 'ready'] },
+      // Confirmed and beyond: an unconfirmed ticket is still with the counter.
+      preparationStatus: { $in: ['confirmed', 'accepted', 'preparing', 'ready'] },
     })
       .populate('table', 'tableId displayName')
       .sort({ createdAt: 1 });
@@ -529,7 +558,8 @@ export const getDisplayOrders = async (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
     return res.json({
       success: true,
-      data: { queued: [], preparing: [], ready: [], active: [], recentlyCompleted: [] },
+      data: { awaitingConfirmation: [], queued: [], preparing: [], ready: [], active: [], recentlyCompleted: [] },
+      awaitingConfirmation: [],
       queued: [],
       preparing: [],
       ready: [],
@@ -540,14 +570,15 @@ export const getDisplayOrders = async (req, res, next) => {
   try {
     const activeOrders = await Order.find({
       paymentStatus: 'paid',
-      preparationStatus: { $in: ['new', 'accepted', 'preparing', 'ready'] },
+      preparationStatus: { $in: ['new', 'confirmed', 'accepted', 'preparing', 'ready'] },
       createdAt: { $gte: new Date(Date.now() - 12 * 60 * 60 * 1000) },
     })
       .populate('table', 'tableId displayName')
       .select('orderNumber preparationStatus paymentStatus table tableId items customerNotes estimatedPrepTime readyAt preparingAt createdAt')
       .sort({ createdAt: 1 });
 
-    const queued = activeOrders.filter((o) => o.preparationStatus === 'new' || o.preparationStatus === 'accepted');
+    const awaitingConfirmation = activeOrders.filter((o) => o.preparationStatus === 'new');
+    const queued = activeOrders.filter((o) => ['new', 'confirmed', 'accepted'].includes(o.preparationStatus));
     const preparing = activeOrders.filter((o) => o.preparationStatus === 'preparing');
     const ready = activeOrders.filter((o) => o.preparationStatus === 'ready');
 
@@ -563,6 +594,7 @@ export const getDisplayOrders = async (req, res, next) => {
 
     const now = Date.now();
     const progressLists = {
+      awaitingConfirmation: withProgressList(awaitingConfirmation, now),
       queued: withProgressList(queued, now),
       preparing: withProgressList(preparing, now),
       ready: withProgressList(ready, now),
@@ -772,9 +804,33 @@ export const getSalesReport = async (req, res, next) => {
 // @route   PATCH /api/orders/:id/cancel
 export const cancelOrder = async (req, res, next) => {
   try {
-    const { reason, isStaffOverride } = req.body;
+    const { reason, tableToken } = req.body;
+
+    // Only staff may cancel from the console. A guest proves the order is theirs by
+    // presenting the table token it was placed with; a body flag proves nothing.
+    const isStaff = Boolean(req.user) && ['owner', 'counter', 'kitchen'].includes(req.user.role);
+    const token = tableToken || req.headers['x-table-token'];
+    if (!isStaff && (!token || typeof token !== 'string')) {
+      return res.status(401).json({ success: false, message: 'Cancellation needs the table code from your QR.' });
+    }
+
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    if (!isStaff) {
+      let tokenTableId = null;
+      if (isDemoToken(token)) {
+        tokenTableId = demoTableFor(token).tableId;
+      } else {
+        const QRToken = (await import('../models/QRToken.js')).default;
+        const qrToken = await QRToken.validateToken(token);
+        tokenTableId = qrToken?.table?.tableId || null;
+      }
+
+      if (!tokenTableId || tokenTableId !== order.tableId) {
+        return res.status(403).json({ success: false, message: 'That order does not belong to this table.' });
+      }
+    }
 
     // If order is already completed or cancelled
     if (['completed', 'cancelled'].includes(order.preparationStatus)) {
@@ -787,8 +843,8 @@ export const cancelOrder = async (req, res, next) => {
     const elapsedMs = Date.now() - new Date(order.createdAt).getTime();
     const elapsedSeconds = Math.floor(elapsedMs / 1000);
 
-    // If not staff override, enforce 1-minute (65s for network transit tolerance)
-    if (!isStaffOverride) {
+    // Guests get a one-minute window; staff can cancel at any point.
+    if (!isStaff) {
       if (order.preparationStatus === 'preparing' || order.preparationStatus === 'ready') {
         return res.status(400).json({
           success: false,
@@ -810,7 +866,7 @@ export const cancelOrder = async (req, res, next) => {
     const fromStatus = order.preparationStatus;
     order.preparationStatus = 'cancelled';
     order.cancelledAt = new Date();
-    order.cancelReason = reason || (isStaffOverride ? 'Cancelled by Counter Staff' : 'Customer cancelled within 1-minute window');
+    order.cancelReason = reason || (isStaff ? `Cancelled by ${req.user.role} staff` : 'Customer cancelled within 1-minute window');
 
     // Update payment status if paid
     if (order.paymentStatus === 'paid') {
@@ -856,17 +912,23 @@ export const cancelOrder = async (req, res, next) => {
       io.to('admin').emit('order:statusUpdate', updatedOrder);
       io.to('admin').emit('order:status:changed', payload);
 
-      io.to('display').emit('order:statusUpdate', updatedOrder);
-      io.to('display').emit('order:status:changed', payload);
+      io.to('display').emit('order:statusUpdate', publicOrderView(updatedOrder));
+      io.to('display').emit('order:status:changed', { ...payload, order: publicOrderView(updatedOrder) });
 
       io.to(`order:${order._id}`).emit('order:statusUpdate', updatedOrder);
       io.to(`order:${order._id}`).emit('order:status:changed', payload);
       io.to(`token:${order.tableId}`).emit('order:status:changed', payload);
     }
 
+    recordAudit(req, 'order_cancelled', {
+      targetModel: 'Order',
+      targetId: order._id,
+      details: { reason: order.cancelReason, by: isStaff ? 'staff' : 'guest' },
+    });
+
     res.json({
       success: true,
-      data: updatedOrder,
+      data: publicOrderView(updatedOrder),
       message: 'Order cancelled successfully',
     });
   } catch (error) {
@@ -902,6 +964,12 @@ export const clearOrder = async (req, res, next) => {
       io.to('kitchen').emit('order:status:changed', { orderId: order._id, preparationStatus: 'completed' });
       io.to('admin').emit('order:status:changed', { orderId: order._id, preparationStatus: 'completed' });
     }
+
+    recordAudit(req, 'order_cleared', {
+      targetModel: 'Order',
+      targetId: order._id,
+      details: { orderNumber: order.orderNumber },
+    });
 
     res.json({ success: true, message: 'Order cleared from live board and tables' });
   } catch (error) {

@@ -12,9 +12,10 @@ const TableQrDialog = ({ table, onClose }) => {
     onClose={() => onClose()}
     title={`Table Standee Card • ${table.displayName}`}
     maxWidth="max-w-md"
+    scrollBody={false}
   >
-    <div className="py-2">
-      <TableQRStandee table={table} showActions={true} />
+    <div className="py-1">
+      <TableQRStandee table={table} showActions={true} dense />
     </div>
   </Modal>
 

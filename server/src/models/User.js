@@ -31,6 +31,18 @@ const userSchema = new mongoose.Schema({
     default: true,
   },
   lastLogin: Date,
+  // Brute-force protection: after repeated wrong passwords the account refuses to sign
+  // in for a short, cooling-down window. Never exposed through the API.
+  failedLoginAttempts: {
+    type: Number,
+    default: 0,
+    select: false,
+  },
+  lockUntil: {
+    type: Date,
+    default: null,
+    select: false,
+  },
 }, {
   timestamps: true,
 });
@@ -50,6 +62,8 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.toJSON = function () {
   const user = this.toObject();
   delete user.password;
+  delete user.failedLoginAttempts;
+  delete user.lockUntil;
   return user;
 };
 

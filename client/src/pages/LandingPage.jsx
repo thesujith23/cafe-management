@@ -126,7 +126,7 @@ const LandingPage = () => {
               size="lg"
               magnetic={true}
               spark={true}
-              sparkColor="#967aa1"
+              sparkColor="#ff7a5c"
               icon={Camera}
               iconPosition="left"
               className="rounded-full shadow-lg shadow-space_indigo/15 px-8"
@@ -140,7 +140,7 @@ const LandingPage = () => {
                 size="lg"
                 magnetic={true}
                 spark={true}
-                sparkColor="#aaa1c8"
+                sparkColor="#ff9277"
                 icon={QrCode}
                 iconPosition="left"
                 className="rounded-full border-space_indigo/20 text-space_indigo hover:bg-space_indigo/5 px-8"
@@ -155,7 +155,7 @@ const LandingPage = () => {
                 size="lg"
                 magnetic={true}
                 spark={true}
-                sparkColor="#bf5e6b"
+                sparkColor="#c2412a"
                 icon={ChefHat}
                 iconPosition="left"
                 className="rounded-full text-space_indigo/70 hover:text-space_indigo"
@@ -170,7 +170,7 @@ const LandingPage = () => {
                 size="lg"
                 magnetic={true}
                 spark={true}
-                sparkColor="#d5c6e0"
+                sparkColor="#f3ebdd"
                 icon={Tv}
                 iconPosition="left"
                 className="rounded-full text-space_indigo/70 hover:text-space_indigo"
@@ -247,7 +247,7 @@ const LandingPage = () => {
               size="sm"
               magnetic={true}
               spark={true}
-              sparkColor="#d5c6e0"
+              sparkColor="#f3ebdd"
               icon={Printer}
               iconPosition="left"
               className="rounded-full text-xs font-semibold"
@@ -325,7 +325,7 @@ const LandingPage = () => {
                           level="H"
                           includeMargin={false}
                           bgColor="#ffffff"
-                          fgColor="#192a51"
+                          fgColor="#2f4a3a"
                         />
                       </div>
                       <div className="min-w-0 font-futura">
@@ -350,7 +350,7 @@ const LandingPage = () => {
                         size="md"
                         magnetic={true}
                         spark={true}
-                        sparkColor="#967aa1"
+                        sparkColor="#ff7a5c"
                         icon={ArrowRight}
                         iconPosition="right"
                         className="w-full text-center rounded-2xl bg-thistle-900/80 hover:bg-space_indigo hover:text-white transition-colors duration-200"

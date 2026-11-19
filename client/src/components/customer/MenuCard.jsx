@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Clock3, Plus, SlidersHorizontal } from 'lucide-react';
 import { formatINR } from '../../utils/formatters';
+import { getMenuImage } from '../../utils/menuImages';
 
 const FOOD_SHEET = '/images/cafe-food-montage.png';
 
@@ -17,7 +18,9 @@ const MenuCard = ({ item, onSelect, onQuickAdd }) => {
   const [justAdded, setJustAdded] = useState(false);
   const hasCustomizations = Boolean(item.sizes?.length || item.addons?.length);
   const isOutOfStock = !item.isAvailable;
-  const uploadedImage = item.image && !photoFailed;
+  // Prefer an image the admin uploaded, otherwise use the photo that matches this dish's name.
+  const dishImage = item.image || getMenuImage(item);
+  const uploadedImage = dishImage && !photoFailed;
   const fallbackPosition = getFoodPosition(item);
 
   const addItem = () => {
@@ -34,7 +37,7 @@ const MenuCard = ({ item, onSelect, onQuickAdd }) => {
     <article className={`order-food-card ${isOutOfStock ? 'is-unavailable' : ''}`}>
       <button className="order-food-photo-button" type="button" onClick={() => onSelect(item)} aria-label={`View ${item.name}`}>
         {uploadedImage ? (
-          <img className="order-food-photo" src={item.image} alt={item.name} loading="lazy" onError={() => setPhotoFailed(true)} />
+          <img className="order-food-photo" src={dishImage} alt={item.name} loading="lazy" onError={() => setPhotoFailed(true)} />
         ) : (
           <span className="order-food-photo order-food-photo-sheet" role="img" aria-label={item.name} style={{ backgroundImage: `url(${FOOD_SHEET})`, backgroundPosition: fallbackPosition }} />
         )}

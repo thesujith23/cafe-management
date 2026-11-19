@@ -7,7 +7,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
  * The one dialog in the app. Escape closes it, Tab stays inside it, focus returns to
  * whatever opened it, and the title is what screen readers announce.
  */
-const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg', className = '' }) => {
+const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg', className = '', scrollBody = true }) => {
   const boxRef = useRef(null);
   const restoreFocusRef = useRef(null);
   const onCloseRef = useRef(onClose);
@@ -68,7 +68,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg', classN
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative w-full ${maxWidth} bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200 outline-none ${className}`}
+        className={`relative w-full ${maxWidth} max-h-[calc(100svh-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200 outline-none ${className}`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <h3 id={titleId} className="font-semibold text-slate-800 text-lg">{title}</h3>
@@ -80,7 +80,12 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg', classN
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6 max-h-[80vh] overflow-y-auto">{children}</div>
+        <div className={scrollBody
+          ? 'p-6 max-h-[80vh] overflow-y-auto'
+          : 'p-4 overflow-hidden'}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

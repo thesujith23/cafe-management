@@ -6,9 +6,11 @@ const DEFAULT_PREP_MINUTES = 15;
 // Each stage owns a slice of the 0-100 band. `accepted` is not a customer step, but it
 // is a real state on the order and it anchors the ETA before cooking starts.
 const STAGES = [
-  { key: 'new', label: 'Received', start: 0, end: 8 },
-  { key: 'accepted', label: 'Accepted', start: 8, end: 16 },
-  { key: 'preparing', label: 'Cooking', start: 16, end: 90 },
+  { key: 'new', label: 'Awaiting counter', start: 0, end: 6 },
+  // Counter confirmation sits between payment and the kitchen picking the ticket up.
+  { key: 'confirmed', label: 'Sent to kitchen', start: 6, end: 12 },
+  { key: 'accepted', label: 'In the kitchen', start: 12, end: 18 },
+  { key: 'preparing', label: 'Cooking', start: 18, end: 90 },
   { key: 'ready', label: 'Ready', start: 90, end: 96 },
   { key: 'completed', label: 'Served', start: 96, end: 100 },
 ];
@@ -35,6 +37,7 @@ const reachedStage = (order) => {
   if (toMs(order.readyAt)) return 'ready';
   if (toMs(order.preparingAt)) return 'preparing';
   if (toMs(order.acceptedAt)) return 'accepted';
+  if (toMs(order.confirmedAt)) return 'confirmed';
   return 'new';
 };
 
@@ -119,6 +122,7 @@ export const describeProgress = (order = {}, now = Date.now()) => {
     (status === 'ready' && (toMs(order.readyAt) ?? toMs(order.preparingAt))) ||
     (status === 'completed' && (toMs(order.completedAt) ?? toMs(order.readyAt))) ||
     (status === 'accepted' && toMs(order.acceptedAt)) ||
+    (status === 'confirmed' && toMs(order.confirmedAt)) ||
     placedAt;
 
   const isLate = Boolean(etaAt) && now > etaAt && (status === 'preparing' || status === 'ready');

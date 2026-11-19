@@ -6,7 +6,7 @@ import { useRef, useEffect, useCallback } from 'react';
  * Uses the café palette: sage, toasted tomato, butter and soft garden greens.
  */
 export default function ClickSpark({
-  sparkColor = '#967aa1',
+  sparkColor = '#ff7a5c',
   sparkSize = 10,
   sparkRadius = 24,
   sparkCount = 9,
@@ -105,7 +105,7 @@ export default function ClickSpark({
     const y = e.clientY - rect.top;
 
     const now = performance.now();
-    const colors = ['#52664b', '#b96849', '#d5bd7d', '#839475', '#e8e4d7'];
+    const colors = ['#2f4a3a', '#ff7a5c', '#c2412a', '#41614d', '#f3ebdd'];
     const newSparks = Array.from({ length: sparkCount }, (_, i) => ({
       x,
       y,

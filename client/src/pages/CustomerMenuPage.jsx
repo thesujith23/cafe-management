@@ -77,7 +77,7 @@ const CustomerMenuPage = () => {
 
         // 1. Validate table QR token
         const tableRes = await tableApi.validateToken(token);
-        if (!tableRes.success || !tableRes.data?.table) {
+        if (!tableRes?.success || !tableRes.data?.table) {
           throw new Error('This QR code is invalid or has expired. Please ask staff for assistance.');
         }
         const tbl = tableRes.data.table;
@@ -85,7 +85,7 @@ const CustomerMenuPage = () => {
 
         // A returning guest keeps their name. A new one is asked at checkout, not here —
         // the menu should be readable before anyone asks who you are.
-        const savedCustomer = localStorage.getItem(`cafe_customer_${token}`);
+        const savedCustomer = sessionStorage.getItem(`cafe_customer_${token}`);
         if (savedCustomer) {
           try {
             const parsed = JSON.parse(savedCustomer);
@@ -104,8 +104,8 @@ const CustomerMenuPage = () => {
           menuApi.getMenuItems(),
         ]);
 
-        if (catRes.success) setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || []);
-        if (itemsRes.success) setMenuItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data?.items || []);
+        if (catRes?.success) setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || []);
+        if (itemsRes?.success) setMenuItems(Array.isArray(itemsRes.data) ? itemsRes.data : itemsRes.data?.items || []);
       } catch (err) {
         setError(err.message || 'Failed to load cafe menu.');
       } finally {
@@ -175,7 +175,7 @@ const CustomerMenuPage = () => {
       };
 
       setCustomerInfo(updated);
-      localStorage.setItem(`cafe_customer_${token}`, JSON.stringify(updated));
+      sessionStorage.setItem(`cafe_customer_${token}`, JSON.stringify(updated));
       setTableInfo((prev) => ({ ...prev, status: 'occupied' }));
       setIsCheckinOpen(false);
       continueAfterCheckin();
@@ -188,7 +188,7 @@ const CustomerMenuPage = () => {
         guests: Number(checkinForm.guests) || 1,
       };
       setCustomerInfo(updated);
-      localStorage.setItem(`cafe_customer_${token}`, JSON.stringify(updated));
+      sessionStorage.setItem(`cafe_customer_${token}`, JSON.stringify(updated));
       setIsCheckinOpen(false);
       continueAfterCheckin();
     } finally {

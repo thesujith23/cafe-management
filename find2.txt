@@ -1,0 +1,63 @@
+
+[38;5;102mInstall with[0m npx skills add <owner/repo@skill>
+
+[38;5;145memilkowalski/skills@ask-sonner[0m [36m132.4K installs[0m
+[38;5;102mΓöö https://skills.sh/emilkowalski/skills/ask-sonner[0m
+
+[38;5;145manthropics/skills@web-artifacts-builder[0m [36m111.3K installs[0m
+[38;5;102mΓöö https://skills.sh/anthropics/skills/web-artifacts-builder[0m
+
+[38;5;145mexpo/skills@expo-tailwind-setup[0m [36m53.6K installs[0m
+[38;5;102mΓöö https://skills.sh/expo/skills/expo-tailwind-setup[0m
+
+[38;5;145mgiuseppe-trisciuoglio/developer-kit@shadcn-ui[0m [36m22.3K installs[0m
+[38;5;102mΓöö https://skills.sh/giuseppe-trisciuoglio/developer-kit/shadcn-ui[0m
+
+[38;5;145mgiuseppe-trisciuoglio/developer-kit@tailwind-css-patterns[0m [36m17.6K installs[0m
+[38;5;102mΓöö https://skills.sh/giuseppe-trisciuoglio/developer-kit/tailwind-css-patterns[0m
+
+[38;5;145mheroui-inc/heroui@heroui-react[0m [36m12.1K installs[0m
+[38;5;102mΓöö https://skills.sh/heroui-inc/heroui/heroui-react[0m
+
+[38;5;145mheroui-inc/heroui@heroui-native[0m [36m10.8K installs[0m
+[38;5;102mΓöö https://skills.sh/heroui-inc/heroui/heroui-native[0m
+
+[38;5;145msecondsky/claude-skills@tailwind-v4-shadcn[0m [36m8.1K installs[0m
+[38;5;102mΓöö https://skills.sh/secondsky/claude-skills/tailwind-v4-shadcn[0m
+
+[38;5;145mmindrally/skills@nextjs-react-typescript[0m [36m5.2K installs[0m
+[38;5;102mΓöö https://skills.sh/mindrally/skills/nextjs-react-typescript[0m
+
+[38;5;145mcomposiohq/awesome-claude-skills@artifacts-builder[0m [36m4.6K installs[0m
+[38;5;102mΓöö https://skills.sh/composiohq/awesome-claude-skills/artifacts-builder[0m
+
+[38;5;145mjezweb/claude-skills@shadcn-ui[0m [36m3.6K installs[0m
+[38;5;102mΓöö https://skills.sh/jezweb/claude-skills/shadcn-ui[0m
+
+[38;5;145mmanavarya09/design-extract@extract-design[0m [36m2.8K installs[0m
+[38;5;102mΓöö https://skills.sh/manavarya09/design-extract/extract-design[0m
+
+[38;5;145mfreshtechbro/claudedesignskills@animated-component-libraries[0m [36m2.8K installs[0m
+[38;5;102mΓöö https://skills.sh/freshtechbro/claudedesignskills/animated-component-libraries[0m
+
+[38;5;145mjezweb/claude-skills@tanstack-start[0m [36m2.5K installs[0m
+[38;5;102mΓöö https://skills.sh/jezweb/claude-skills/tanstack-start[0m
+
+[38;5;145msickn33/agentic-awesome-skills@react-nextjs-development[0m [36m2K installs[0m
+[38;5;102mΓöö https://skills.sh/sickn33/agentic-awesome-skills/react-nextjs-development[0m
+
+[38;5;145mdavila7/claude-code-templates@ui-ux-pro-max[0m [36m1.8K installs[0m
+[38;5;102mΓöö https://skills.sh/davila7/claude-code-templates/ui-ux-pro-max[0m
+
+[38;5;145malirezarezvani/claude-skills@senior-frontend[0m [36m1.6K installs[0m
+[38;5;102mΓöö https://skills.sh/alirezarezvani/claude-skills/senior-frontend[0m
+
+[38;5;145mcap-go/capgo-skills@ionic-design[0m [36m1.6K installs[0m
+[38;5;102mΓöö https://skills.sh/cap-go/capgo-skills/ionic-design[0m
+
+[38;5;145msecondsky/claude-skills@aceternity-ui[0m [36m1.5K installs[0m
+[38;5;102mΓöö https://skills.sh/secondsky/claude-skills/aceternity-ui[0m
+
+[38;5;145mcomposio-community/awesome-claude-plugins@senior-frontend[0m [36m1.5K installs[0m
+[38;5;102mΓöö https://skills.sh/composio-community/awesome-claude-plugins/senior-frontend[0m
+

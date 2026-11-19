@@ -1,0 +1,20 @@
+{
+  "clientApp_importsChatBubble": true,
+  "clientApp_rendersChatBubble": true,
+  "clientApp_noInlineCssAssignment": true,
+  "indexCss_hasChatStyles": true,
+  "bubble_callsApi": true,
+  "api_callsApiChat": true,
+  "chatRoute_pathIsApiChat": true,
+  "chatRoute_replyShape": true,
+  "chatRoute_usesGroq": true,
+  "chatRoute_readsConfigGroqApiKey": true,
+  "chatRoute_hasCatch": true,
+  "config_exportsGroqApiKey": true,
+  "env_hasGroqApiKey": true,
+  "app_mountsChatRoutes": true,
+  "groqInPackageJson": true,
+  "clientViteBuildOk": true,
+  "notes": [],
+  "status": "aligned"
+}

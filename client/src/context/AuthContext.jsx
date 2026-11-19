@@ -25,6 +25,19 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  // A 401 anywhere in the console means the session is gone. Drop the user so the
+  // guards put them back on the sign-in screen instead of an empty dashboard.
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser((current) => {
+        if (current) toast.error('Your session expired — please sign in again.');
+        return null;
+      });
+    };
+    window.addEventListener('lw:session-expired', handleExpired);
+    return () => window.removeEventListener('lw:session-expired', handleExpired);
+  }, []);
+
   const login = async (email, password) => {
     const response = await authApi.login({ email, password });
     if (response.success && response.data?.user) {

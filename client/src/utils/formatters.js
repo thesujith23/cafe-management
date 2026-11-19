@@ -59,9 +59,21 @@ export const ORDER_STATUS_CONFIG = {
     dot: 'bg-dusty_mauve',
   },
   new: {
-    label: 'Order Placed',
+    label: 'Awaiting Counter',
     color: 'space_indigo',
     bg: 'bg-space_indigo-900 text-space_indigo-300 border-space_indigo-700/50',
+    dot: 'bg-space_indigo',
+  },
+  confirmed: {
+    label: 'With the Kitchen',
+    color: 'space_indigo',
+    bg: 'bg-space_indigo-900 text-space_indigo-200 border-space_indigo-700/60',
+    dot: 'bg-space_indigo',
+  },
+  accepted: {
+    label: 'Accepted by Kitchen',
+    color: 'space_indigo',
+    bg: 'bg-space_indigo-900 text-space_indigo-200 border-space_indigo-700/60',
     dot: 'bg-space_indigo',
   },
   preparing: {
@@ -77,6 +89,12 @@ export const ORDER_STATUS_CONFIG = {
     dot: 'bg-emerald-500',
   },
   served: {
+    label: 'Served & Completed',
+    color: 'lilac_ash',
+    bg: 'bg-lilac_ash-900 text-space_indigo-300 border-lilac_ash-700/60',
+    dot: 'bg-lilac_ash',
+  },
+  completed: {
     label: 'Served & Completed',
     color: 'lilac_ash',
     bg: 'bg-lilac_ash-900 text-space_indigo-300 border-lilac_ash-700/60',

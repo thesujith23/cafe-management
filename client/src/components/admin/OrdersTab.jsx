@@ -150,9 +150,18 @@ const OrdersTab = ({ orders, filter, onFilterChange, onAdvanceStatus, onInspect 
                     <div className="flex items-center gap-1.5 flex-wrap font-aleo">
                       {order.preparationStatus === 'new' && (
                         <button
+                          onClick={() => onAdvanceStatus(order._id, 'confirmed')}
+                          className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-space_indigo to-dusty_mauve text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
+                          title="Confirm the table and dishes — sends the ticket to the kitchen"
+                        >
+                          Confirm
+                        </button>
+                      )}
+                      {order.preparationStatus === 'confirmed' && (
+                        <button
                           onClick={() => onAdvanceStatus(order._id, 'preparing')}
                           className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-space_indigo to-dusty_mauve text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
-                          title="Send order to kitchen cooking"
+                          title="Start cooking this confirmed ticket"
                         >
                           Cook
                         </button>

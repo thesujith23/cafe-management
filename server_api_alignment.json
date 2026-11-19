@@ -1,0 +1,5 @@
+{
+  "server_chatRouteReplyShape": true,
+  "server_chatRoutePath": true,
+  "api_services_sendMessageCallsApiChat": false
+}

@@ -23,7 +23,9 @@ export const CartProvider = ({ children }) => {
         setCustomerNotes('');
       }
 
-      const savedCust = localStorage.getItem(`cafe_customer_${token}`);
+      // Name and phone last for the visit only: sessionStorage clears when the tab
+      // closes, so a borrowed phone or a shared tablet does not keep a guest's contact.
+      const savedCust = sessionStorage.getItem(`cafe_customer_${token}`);
       if (savedCust) {
         setCustomerInfo(JSON.parse(savedCust));
       }
@@ -32,11 +34,11 @@ export const CartProvider = ({ children }) => {
     }
   }, [token]);
 
-  // Persist customer info to localStorage when changed
+  // Persist guest contact for this visit only
   useEffect(() => {
     if (!token || !customerInfo.name) return;
     try {
-      localStorage.setItem(`cafe_customer_${token}`, JSON.stringify(customerInfo));
+      sessionStorage.setItem(`cafe_customer_${token}`, JSON.stringify(customerInfo));
     } catch {
       // Storage unavailable fallback
     }

@@ -5,6 +5,24 @@ import Order from '../models/Order.js';
 import Payment from '../models/Payment.js';
 import OrderStatusHistory from '../models/OrderStatusHistory.js';
 import DiningTable from '../models/DiningTable.js';
+import { isDemoToken, demoTableFor } from '../middleware/validateQR.js';
+import { publicOrderView } from '../utils/publicOrder.js';
+import { recordAudit } from '../utils/audit.js';
+import logger from '../utils/logger.js';
+
+// Resolve the table a QR token belongs to. Returns null for an unknown token.
+const tableIdForToken = async (token) => {
+  if (typeof token !== 'string' || !token) return null;
+  if (isDemoToken(token)) return demoTableFor(token).tableId;
+  const QRToken = (await import('../models/QRToken.js')).default;
+  const qrToken = await QRToken.validateToken(token);
+  return qrToken?.table?.tableId || null;
+};
+
+const orderBelongsToToken = async (order, token) => {
+  const tableId = await tableIdForToken(token);
+  return Boolean(tableId) && tableId === order.tableId;
+};
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -25,6 +43,18 @@ export const createPaymentOrder = async (req, res, next) => {
 
     if (order.paymentStatus === 'paid') {
       return res.status(400).json({ success: false, message: 'Order already paid' });
+    }
+
+    // A payment may only be started by staff or by the guest who holds this table's QR.
+    const isStaff = Boolean(req.user) && ['owner', 'counter'].includes(req.user.role);
+    if (!isStaff) {
+      const token = req.body?.tableToken || req.headers['x-table-token'];
+      if (!token) {
+        return res.status(401).json({ success: false, message: 'Payment needs the table code from your QR.' });
+      }
+      if (!(await orderBelongsToToken(order, token))) {
+        return res.status(403).json({ success: false, message: 'That order does not belong to this table.' });
+      }
     }
 
     // Check if a payment order already exists and is still valid
@@ -113,18 +143,30 @@ export const verifyPayment = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Payment record not found' });
     }
 
+    const ownedOrder = await Order.findById(payment.order);
+    const isStaff = Boolean(req.user) && ['owner', 'counter'].includes(req.user.role);
+    if (!isStaff) {
+      const token = req.body?.tableToken || req.headers['x-table-token'];
+      if (!token || !ownedOrder || !(await orderBelongsToToken(ownedOrder, token))) {
+        return res.status(403).json({ success: false, message: 'That payment does not belong to this table.' });
+      }
+    }
+
     // Idempotency: if already verified, return success
     if (payment.status === 'captured' && payment.verifiedAt) {
       const order = await Order.findById(payment.order);
       return res.json({ success: true, data: { order, payment }, message: 'Already verified' });
     }
 
-    // Check if this was a demo order or signature verification
-    const isDemoOrder =
+    // Demo verification is a development affordance. With live Razorpay keys it must
+    // never let a made-up signature mark an order paid.
+    const demoMode = isDummyKey || !config.isProduction;
+    const isDemoOrder = demoMode && (
       razorpay_order_id.startsWith('order_demo_') ||
       razorpay_payment_id.startsWith('pay_demo_') ||
       razorpay_signature === 'demo_signature' ||
-      isDummyKey;
+      isDummyKey
+    );
 
     if (!isDemoOrder) {
       if (!razorpay_signature) {
@@ -185,11 +227,17 @@ export const verifyPayment = async (req, res, next) => {
     // Emit real-time events
     const io = req.app.get('io');
     if (io) {
-      io.to('kitchen').emit('order:new', populatedOrder);
+      // Paid, but not yet confirmed by the counter: the kitchen is told when it is.
       io.to('admin').emit('order:new', populatedOrder);
-      io.to('display').emit('order:new', populatedOrder);
+      io.to('display').emit('order:new', publicOrderView(populatedOrder));
       io.to(`order:${order._id}`).emit('order:paid', populatedOrder);
     }
+
+    recordAudit(req, 'order_payment_verified', {
+      targetModel: 'Order',
+      targetId: order._id,
+      details: { orderNumber: order.orderNumber, amount: order.totalAmount, demo: isDemoOrder },
+    });
 
     res.json({ success: true, data: { order: populatedOrder, payment } });
   } catch (error) {
@@ -204,6 +252,10 @@ export const handleWebhook = async (req, res, next) => {
     // Verify webhook signature using raw body
     const webhookSignature = req.headers['x-razorpay-signature'];
     const webhookBody = req.rawBody || JSON.stringify(req.body);
+
+    if (!config.razorpay.webhookSecret && config.isProduction) {
+      return res.status(503).json({ success: false, message: 'Webhook is not configured' });
+    }
 
     if (config.razorpay.webhookSecret) {
       const expectedSignature = crypto
@@ -266,7 +318,7 @@ export const handleWebhook = async (req, res, next) => {
     // Always respond 200 to Razorpay
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Webhook error:', error);
+    logger.error('payment webhook failed', { error: error?.message });
     res.status(200).json({ success: true }); // Still respond 200 to avoid retries
   }
 };

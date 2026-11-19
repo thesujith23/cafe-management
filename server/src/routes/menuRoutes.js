@@ -5,6 +5,8 @@ import {
   archiveMenuItem, toggleAvailability,
 } from '../controllers/menuController.js';
 import { protect, authorize } from '../middleware/auth.js';
+import { validateBody } from '../middleware/validate.js';
+import { menuItemSchema } from '../validators/schemas.js';
 
 const router = Router();
 
@@ -18,7 +20,7 @@ router.post('/categories', protect, authorize('owner', 'counter'), createCategor
 router.put('/categories/:id', protect, authorize('owner', 'counter'), updateCategory);
 router.delete('/categories/:id', protect, authorize('owner'), deleteCategory);
 
-router.post('/items', protect, authorize('owner', 'counter'), createMenuItem);
+router.post('/items', protect, authorize('owner', 'counter'), validateBody(menuItemSchema), createMenuItem);
 router.put('/items/:id', protect, authorize('owner', 'counter'), updateMenuItem);
 router.delete('/items/:id', protect, authorize('owner'), archiveMenuItem);
 router.patch('/items/:id/availability', protect, authorize('owner', 'counter'), toggleAvailability);

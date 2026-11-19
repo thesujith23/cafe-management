@@ -1,0 +1,54 @@
+
+[38;5;102mInstall with[0m npx skills add <owner/repo@skill>
+
+[38;5;145malirezarezvani/claude-skills@senior-fullstack[0m [36m1.4K installs[0m
+[38;5;102mΓöö https://skills.sh/alirezarezvani/claude-skills/senior-fullstack[0m
+
+[38;5;145mthelobbi/claude@mern-patterns[0m [36m55 installs[0m
+[38;5;102mΓöö https://skills.sh/thelobbi/claude/mern-patterns[0m
+
+[38;5;145mmanish1803/nextjs-fullstack-skills@mern-stack-architecture[0m [36m17 installs[0m
+[38;5;102mΓöö https://skills.sh/manish1803/nextjs-fullstack-skills/mern-stack-architecture[0m
+
+[38;5;145mquestnova502/claude-skills-sync@senior-fullstack[0m [36m7 installs[0m
+[38;5;102mΓöö https://skills.sh/questnova502/claude-skills-sync/senior-fullstack[0m
+
+[38;5;145mjohnefemer/skillfish@senior-fullstack[0m [36m7 installs[0m
+[38;5;102mΓöö https://skills.sh/johnefemer/skillfish/senior-fullstack[0m
+
+[38;5;145mmouadja02/skills@senior-fullstack[0m [36m4 installs[0m
+[38;5;102mΓöö https://skills.sh/mouadja02/skills/senior-fullstack[0m
+
+[38;5;145mroger-235/my_skill_repo@senior-fullstack[0m [36m3 installs[0m
+[38;5;102mΓöö https://skills.sh/roger-235/my_skill_repo/senior-fullstack[0m
+
+[38;5;145mibzeid/skills-for-claude-code@senior-fullstack[0m [36m2 installs[0m
+[38;5;102mΓöö https://skills.sh/ibzeid/skills-for-claude-code/senior-fullstack[0m
+
+[38;5;145mmodelscope.cn@senior-fullstack[0m [36m2 installs[0m
+[38;5;102mΓöö https://skills.sh/modelscope.cn/senior-fullstack-alirezarezvani[0m
+
+[38;5;145mashutosh5hukla/marketplace@MarketPlace[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/ashutosh5hukla/marketplace/marketplace[0m
+
+[38;5;145mvishvajeet2012/skills-for-claude-code@senior-fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/vishvajeet2012/skills-for-claude-code/senior-fullstack[0m
+
+[38;5;145mrealwigu/claude-skills@senior-fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/realwigu/claude-skills/senior-fullstack[0m
+
+[38;5;145miwanhe/pandawa@senior-fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/iwanhe/pandawa/senior-fullstack[0m
+
+[38;5;145mciciliaeth/claude-skills@senior-fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/ciciliaeth/claude-skills/senior-fullstack[0m
+
+[38;5;145mbestagentkits/agency-skills@senior-fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/bestagentkits/agency-skills/senior-fullstack[0m
+
+[38;5;145malvstore/incline@senior-fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/alvstore/incline/senior-fullstack[0m
+
+[38;5;145malvindean/soniq@senior-fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/alvindean/soniq/senior-fullstack[0m
+

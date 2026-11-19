@@ -1,0 +1,5 @@
+{
+  "startScript": "node src/server.js",
+  "isPm2": false,
+  "notes": "start script is a direct node command"
+}

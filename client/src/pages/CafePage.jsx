@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BellRing, CalendarDays, ChefHat, Coffee, Eye, Flame, HelpCircle, LayoutDashboard, LogIn, LogOut, ShoppingBag, Trees, Utensils, Waves, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BellRing, CalendarDays, ChefHat, Coffee, Eye, Flame, HelpCircle, ShoppingBag, Trees, Utensils, Waves, X } from 'lucide-react';
 import { tableApi, orderApi } from '../api/apiServices';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { sounds } from '../utils/sound';
 import Modal from '../components/common/Modal';
-import { homeForRole } from '../utils/roleHome';
 import CafeScene from '../components/cafe/CafeScene';
 import '../styles/cafe-world.css';
 
@@ -26,7 +25,7 @@ const getList = (response) => Array.isArray(response?.data)
 const getOrderGroups = (response) => {
   const data = response?.data || {};
   return {
-    queued: data.queued || data.active?.filter((order) => ['new', 'accepted'].includes(order.preparationStatus)) || [],
+    queued: data.queued || data.active?.filter((order) => ['new', 'confirmed', 'accepted'].includes(order.preparationStatus)) || [],
     preparing: data.preparing || data.active?.filter((order) => order.preparationStatus === 'preparing') || [],
     ready: data.ready || data.active?.filter((order) => order.preparationStatus === 'ready') || [],
   };
@@ -83,9 +82,11 @@ const CafePage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { socket } = useSocket();
-  const { user, isAuthenticated, logout } = useAuth();
-  const staffHome = homeForRole(user?.role);
-  const staffLabel = user?.role === 'kitchen' ? 'Kitchen board' : user?.role === 'display' ? 'Display' : 'Console';
+  const { user } = useAuth();
+  // The café room is public. Only a signed-in staff member may move a real ticket;
+  // a visitor gets a local preview of the same animation.
+  const canWorkOrdersRef = useRef(false);
+  canWorkOrdersRef.current = ['owner', 'counter', 'kitchen'].includes(user?.role);
   const [helpOpen, setHelpOpen] = useState(false);
   const [tables, setTables] = useState(FALLBACK_TABLES);
   const [orders, setOrders] = useState({ queued: [], preparing: [], ready: [] });
@@ -103,6 +104,9 @@ const CafePage = () => {
   const completedOrderIds = useRef(new Set());
   const readyTimers = useRef(new Map());
   const pendingOrderIds = useRef(new Set());
+  const kitchenCameraFallback = useRef(null);
+  const promotingOrders = useRef(new Set());
+  const latestStatuses = useRef(new Map());
   const [pendingOrders, setPendingOrders] = useState([]);
   const [incomingOrder, setIncomingOrder] = useState(null);
   const [kitchenFocusOrder, setKitchenFocusOrder] = useState(null);
@@ -110,11 +114,25 @@ const CafePage = () => {
   const previousQueuedIds = useRef(null);
   const incomingOrderTimer = useRef(null);
   const sceneFocusTimer = useRef(null);
+  const arrivalDoneRef = useRef(false);
 
   useEffect(() => {
     if (!location.state?.fromLandingRide) return undefined;
-    const clearArrivalState = window.setTimeout(() => navigate('/cafe', { replace: true, state: null }), 3000);
-    return () => window.clearTimeout(clearArrivalState);
+    if (arrivalDoneRef.current) return undefined;
+    arrivalDoneRef.current = true;
+
+    // One frame of class work, not a permanent animation-frame loop.
+    const frame = window.requestAnimationFrame(() => document.body.classList.add('cafe-airlock-ready'));
+    const clearArrivalState = window.setTimeout(
+      () => navigate('/cafe', { replace: true, state: null }),
+      2200,
+    );
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(clearArrivalState);
+      document.body.classList.remove('cafe-airlock-ready');
+    };
   }, [location.state, navigate]);
 
   const loadOrders = useCallback(async () => {
@@ -122,6 +140,10 @@ const CafePage = () => {
       const response = await orderApi.getDisplayOrders();
       if (response?.success) {
         const groupedOrders = getOrderGroups(response);
+        latestStatuses.current = new Map(
+          [...groupedOrders.queued, ...groupedOrders.preparing, ...groupedOrders.ready]
+            .map((order) => [getOrderKey(order), order.preparationStatus]),
+        );
         setOrders(groupedOrders);
         setHasLoadedOrders(true);
         setKitchenFocusOrder((current) => {
@@ -129,7 +151,7 @@ const CafePage = () => {
           const liveOrder = [...groupedOrders.queued, ...groupedOrders.preparing, ...groupedOrders.ready]
             .find((order) => getOrderKey(order) === getOrderKey(current));
           if (!liveOrder) return current;
-          const rank = { new: 0, accepted: 1, preparing: 2, ready: 3 };
+          const rank = { new: 0, confirmed: 1, accepted: 2, preparing: 3, ready: 4 };
           return (rank[liveOrder.preparationStatus] ?? 0) > (rank[current.preparationStatus] ?? 0) ? liveOrder : current;
         });
       }
@@ -199,6 +221,8 @@ const CafePage = () => {
   useEffect(() => () => {
     readyTimers.current.forEach(window.clearTimeout);
     readyTimers.current.clear();
+    window.clearTimeout(kitchenCameraFallback.current);
+    kitchenCameraFallback.current = null;
   }, []);
 
   useEffect(() => {
@@ -277,16 +301,43 @@ const CafePage = () => {
   }, []);
 
   const updateOrder = useCallback(async (orderId, status) => {
+    if (!canWorkOrdersRef.current) {
+      latestStatuses.current.set(orderId, status);
+      setOrders((current) => {
+        const all = [...current.queued, ...current.preparing, ...current.ready];
+        const found = all.find((order) => getOrderKey(order) === orderId);
+        if (!found) return current;
+        const moved = { ...found, preparationStatus: status === 'served' ? 'completed' : status };
+        const strip = (list) => list.filter((order) => getOrderKey(order) !== orderId);
+        const next = { queued: strip(current.queued), preparing: strip(current.preparing), ready: strip(current.ready) };
+        if (['new', 'confirmed', 'accepted'].includes(status)) next.queued = [...next.queued, moved];
+        else if (status === 'preparing') next.preparing = [...next.preparing, moved];
+        else if (status === 'ready') next.ready = [...next.ready, moved];
+        return next;
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      return;
+    }
     const response = await orderApi.updateOrderStatus(orderId, status);
     if (!response?.success) throw new Error(response?.message || 'The order status could not be updated.');
     await loadOrders();
   }, [loadOrders]);
 
-  const handleKitchenCameraStage = useCallback((stage, orderId) => {
-    if (!kitchenFocusOrder || getOrderKey(kitchenFocusOrder) !== orderId) return;
-    setKitchenCameraMode(stage);
-    if (stage !== 'kitchen' || kitchenFocusOrder.preparationStatus === 'preparing' || kitchenFocusOrder.preparationStatus === 'ready') return;
-
+  // The kitchen promotion must not depend on a rendered camera animation: if the
+  // scene is throttled or the tab is hidden the arrival callback never fires, so the
+  // ticket would sit at 'accepted' forever.
+  const promoteToPreparing = useCallback((orderId) => {
+    if (!orderId || promotingOrders.current.has(orderId)) return;
+    const knownStatus = latestStatuses.current.get(orderId);
+    if (['preparing', 'ready', 'completed', 'served', 'cancelled'].includes(knownStatus)) {
+      window.clearTimeout(kitchenCameraFallback.current);
+      kitchenCameraFallback.current = null;
+      setOrderPending(orderId, false);
+      return;
+    }
+    promotingOrders.current.add(orderId);
+    window.clearTimeout(kitchenCameraFallback.current);
+    kitchenCameraFallback.current = null;
     setOrderPending(orderId, true);
     updateOrder(orderId, 'preparing').then(() => {
       setOrderPending(orderId, false);
@@ -295,8 +346,27 @@ const CafePage = () => {
       setOrderPending(orderId, false);
       setKitchenFocusOrder(null);
       setKitchenCameraMode('');
+    }).finally(() => {
+      promotingOrders.current.delete(orderId);
     });
-  }, [kitchenFocusOrder, setOrderPending, updateOrder]);
+  }, [setOrderPending, updateOrder]);
+
+  const scheduleKitchenArrivalFallback = useCallback((orderId) => {
+    window.clearTimeout(kitchenCameraFallback.current);
+    kitchenCameraFallback.current = window.setTimeout(() => {
+      kitchenCameraFallback.current = null;
+      setKitchenCameraMode((mode) => (mode.startsWith('travelling-') ? 'kitchen' : mode));
+      promoteToPreparing(orderId);
+    }, 7000);
+  }, [promoteToPreparing]);
+
+  const handleKitchenCameraStage = useCallback((stage, orderId) => {
+    if (!kitchenFocusOrder || getOrderKey(kitchenFocusOrder) !== orderId) return;
+    setKitchenCameraMode(stage);
+    if (stage !== 'kitchen' || kitchenFocusOrder.preparationStatus === 'preparing' || kitchenFocusOrder.preparationStatus === 'ready') return;
+
+    promoteToPreparing(orderId);
+  }, [kitchenFocusOrder, promoteToPreparing]);
 
   const scheduleReady = useCallback((order) => {
     const orderId = order?._id;
@@ -315,6 +385,23 @@ const CafePage = () => {
     readyTimers.current.set(orderId, timer);
   }, [setOrderPending, updateOrder]);
 
+  // The counter reads the table and the dishes, then releases the ticket to the kitchen.
+  const confirmToKitchen = useCallback(async (order) => {
+    const orderId = order?._id;
+    if (!orderId || pendingOrderIds.current.has(orderId)) return;
+    setOrderPending(orderId, true);
+    setOrderActionError('');
+    setUpdatingOrder(orderId);
+    try {
+      await updateOrder(orderId, 'confirmed');
+    } catch (error) {
+      setOrderActionError(error.message || 'This ticket could not be sent to the kitchen.');
+    } finally {
+      setUpdatingOrder(null);
+      setOrderPending(orderId, false);
+    }
+  }, [setOrderPending, updateOrder]);
+
   const startPreparation = async (order) => {
     const orderId = order?._id;
     if (!orderId || pendingOrderIds.current.has(orderId)) return;
@@ -326,7 +413,7 @@ const CafePage = () => {
     setStationPopup(null);
     let workflowScheduled = false;
     try {
-      if (order.preparationStatus === 'new') {
+      if (order.preparationStatus === 'confirmed') {
         await updateOrder(orderId, 'accepted');
         workflowScheduled = true;
       } else if (order.preparationStatus === 'accepted') {
@@ -339,6 +426,7 @@ const CafePage = () => {
     } finally {
       setUpdatingOrder(null);
       if (!workflowScheduled) setOrderPending(orderId, false);
+      else scheduleKitchenArrivalFallback(orderId);
     }
   };
 
@@ -350,30 +438,36 @@ const CafePage = () => {
     if (!order?._id || completedOrderIds.current.has(order._id)) return;
     completedOrderIds.current.add(order._id);
     try {
-      const response = await orderApi.updateOrderStatus(order._id, 'served');
-      if (!response?.success) throw new Error('The completed order could not be saved.');
-      await loadOrders();
+      await updateOrder(order._id, 'served');
     } catch (error) {
       completedOrderIds.current.delete(order._id);
       throw error;
     }
-  }, [loadOrders]);
+  }, [updateOrder]);
 
   const visibleOrders = [...orders.queued, ...orders.preparing, ...orders.ready];
   const filteredOrders = orderFilter === 'all'
     ? visibleOrders
-    : visibleOrders.filter((order) => orderFilter === 'new'
-      ? ['new', 'accepted'].includes(order.preparationStatus)
+    : visibleOrders.filter((order) => orderFilter === 'confirmed'
+      ? ['confirmed', 'accepted'].includes(order.preparationStatus)
       : order.preparationStatus === orderFilter);
   const orderCounts = {
     all: visibleOrders.length,
-    new: orders.queued.length,
+    new: visibleOrders.filter((order) => order.preparationStatus === 'new').length,
+    confirmed: visibleOrders.filter((order) => ['confirmed', 'accepted'].includes(order.preparationStatus)).length,
     preparing: orders.preparing.length,
     ready: orders.ready.length,
   };
   const orderName = (order) => order.orderNumber || order.displayOrderId || `Order ${String(order._id || '').slice(-5)}`;
   const orderTableLabel = (order) => order.table?.displayName || order.table?.tableId || order.tableId || '';
   const orderItems = (order) => (order.items || []).map((item) => `${item.quantity || 1}× ${item.name || item.menuItem?.name || 'Cafe item'}`).join(', ');
+  const orderStageLabel = (order) => ({
+    new: 'Awaiting counter',
+    confirmed: 'Sent to kitchen',
+    accepted: 'Sent to kitchen',
+    preparing: 'Cooking',
+    ready: 'Ready',
+  }[order.preparationStatus] || 'New');
   const focusedOrderId = getOrderKey(kitchenFocusOrder);
   const kitchenViewOrder = kitchenFocusOrder
     ? visibleOrders.find((order) => getOrderKey(order) === focusedOrderId) || kitchenFocusOrder
@@ -389,8 +483,7 @@ const CafePage = () => {
     : kitchenViewPhase === 'ready' ? 100 : 5;
   const selectedTable = tables.find((table) => table.tableId === selectedTableForAction);
   const selectedTableName = selectedTable?.displayName || selectedTable?.tableId || 'Your table';
-  const selectedTableIndex = tables.findIndex((table) => table.tableId === selectedTableForAction);
-  const selectedTableIsReserved = Boolean(selectedTable && (selectedTableIndex < 3 || selectedTable.status === 'reserved'));
+  const selectedTableIsReserved = Boolean(selectedTable && selectedTable.status === 'reserved');
   const focusedTable = tables.find((table) => table.tableId === sceneFocus?.tableId);
   const sceneShowcase = sceneFocus ? SCENE_SHOWCASES[sceneFocus.place] : null;
   const SceneShowcaseIcon = sceneShowcase?.icon || Eye;
@@ -398,7 +491,7 @@ const CafePage = () => {
   return (
     <main className={'cafe-world-page cafe-world-3d' + (location.state?.fromLandingRide ? ' is-riding-in' : '')}>
       <CafeScene tables={tables} orders={orders} onSelectTable={handleSceneTableClick} onSelectStation={openStationPopup} onSelectSceneFeature={beginSceneShowcase} onSceneFocusStage={handleSceneFocusStage} sceneFocus={sceneFocus} onGuestCompleted={completeGuestOrder} kitchenFocusOrder={kitchenViewOrder} onKitchenCameraStage={handleKitchenCameraStage} />
-      {location.state?.fromLandingRide && <div className="cafe-arrival-clouds" aria-hidden="true"><span className="cafe-arrival-cloud cafe-arrival-cloud-left" /><span className="cafe-arrival-cloud cafe-arrival-cloud-right" /></div>}
+      {location.state?.fromLandingRide && <div className="cafe-airlock-fabric" aria-hidden="true" />}
       {/* Visible shortcuts: the scene is discoverable by clicking, but nobody should have to guess
           how to get out of it or where the staff side lives. */}
       <div className="cafe-quick-actions" role="group" aria-label="Café room shortcuts">
@@ -415,19 +508,6 @@ const CafePage = () => {
           <HelpCircle size={15} />
           <span>How it works</span>
         </button>
-        {isAuthenticated ? <>
-          <Link className="cafe-quick-link" to={staffHome}>
-            <LayoutDashboard size={15} />
-            <span>{staffLabel}</span>
-          </Link>
-          <button type="button" onClick={logout} aria-label="Sign out" title="Sign out">
-            <LogOut size={15} />
-            <span>Sign out</span>
-          </button>
-        </> : <Link className="cafe-quick-link" to="/admin/login">
-          <LogIn size={15} />
-          <span>Staff sign in</span>
-        </Link>}
         <span className="cafe-quick-hint">Click a table to seat or order · keys 1–6</span>
       </div>
       <Modal isOpen={helpOpen} onClose={() => setHelpOpen(false)} title="How this café room works" maxWidth="max-w-md">
@@ -462,20 +542,21 @@ const CafePage = () => {
       </aside>}
       {stationPopup && <div className="cafe-popover-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setStationPopup(null); }}>
         <section className={`cafe-station-popover ${stationPopup === 'menu' ? 'menu-popover' : 'service-popover'}`} role="dialog" aria-modal="true" aria-labelledby="station-popup-title">
-          <header><span className="station-icon kitchen">{stationPopup === 'kitchen' ? <ChefHat size={17} /> : stationPopup === 'menu' ? <Coffee size={17} /> : stationPopup === 'reservation' ? <CalendarDays size={17} /> : <ShoppingBag size={17} />}</span><div><h2 id="station-popup-title">{stationPopup === 'menu' ? 'Order at your table' : stationPopup === 'reservation' ? 'Reserved table' : 'Kitchen queue'}</h2></div><button type="button" aria-label="Close café window" onClick={() => setStationPopup(null)}><X size={18} /></button></header>
+          <header><span className="station-icon kitchen">{stationPopup === 'kitchen' ? <ChefHat size={17} /> : stationPopup === 'menu' ? <Coffee size={17} /> : stationPopup === 'reservation' ? <CalendarDays size={17} /> : <ShoppingBag size={17} />}</span><div><h2 id="station-popup-title">{stationPopup === 'menu' ? 'Order at your table' : stationPopup === 'reservation' ? 'Reserved table' : 'Counter · ticket desk'}</h2></div><button type="button" aria-label="Close café window" onClick={() => setStationPopup(null)}><X size={18} /></button></header>
           {stationPopup === 'menu' ? <iframe className="cafe-menu-frame" title="Little Window Café table menu" src={`/table/${menuToken}`} /> : stationPopup === 'reservation' ? <div className="reservation-notice"><span><CalendarDays size={19} /></span><h3>{reservedTable?.displayName || reservedTable?.tableId}</h3><p>This table is reserved for a future visit. Choose another table to order.</p>{reservedTable?.reservation?.startsAt && <small>{new Date(reservedTable.reservation.startsAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</small>}<button type="button" onClick={() => setStationPopup(null)}>Choose another table</button></div> : <div className="order-panel-content">
             <div className="order-filter-bar" role="tablist" aria-label="Filter orders by status">
-              {[['all', 'All'], ['new', 'New'], ['preparing', 'Cooking'], ['ready', 'Ready']].map(([filter, label]) => <button type="button" role="tab" aria-selected={orderFilter === filter} className={orderFilter === filter ? 'is-active' : ''} onClick={() => setOrderFilter(filter)} key={filter}>{label}<span>{orderCounts[filter]}</span></button>)}
+              {[['all', 'All'], ['new', 'At counter'], ['confirmed', 'In kitchen'], ['preparing', 'Cooking'], ['ready', 'Ready']].map(([filter, label]) => <button type="button" role="tab" aria-selected={orderFilter === filter} className={orderFilter === filter ? 'is-active' : ''} onClick={() => setOrderFilter(filter)} key={filter}>{label}<span>{orderCounts[filter]}</span></button>)}
             </div>
             {orderActionError && <p className="station-action-error" role="alert">{orderActionError}</p>}
             <div className="station-order-list">
               {filteredOrders.length ? filteredOrders.map((order) => <article className={`station-order-card ${order.preparationStatus === 'preparing' ? 'is-cooking' : ''} ${order.preparationStatus === 'ready' ? 'is-ready' : ''}`} key={order._id}>
-                <div className="station-order-meta"><strong>{orderName(order)}{orderTableLabel(order) ? ` · ${orderTableLabel(order)}` : ''}</strong><span>{order.preparationStatus === 'preparing' ? 'Cooking' : order.preparationStatus === 'ready' ? 'Ready' : order.preparationStatus === 'accepted' ? 'Accepted' : 'New'}</span></div>
+                <div className="station-order-meta"><strong>{orderName(order)}{orderTableLabel(order) ? ` · ${orderTableLabel(order)}` : ''}</strong><span>{orderStageLabel(order)}</span></div>
                 <p>{orderItems(order) || 'Freshly prepared café order'}</p>
-                {(order.preparationStatus === 'new' || order.preparationStatus === 'accepted') && <button type="button" disabled={updatingOrder === order._id || pendingOrders.includes(order._id)} onClick={() => startPreparation(order)}>{updatingOrder === order._id ? 'Accepting…' : pendingOrders.includes(order._id) ? 'Starting…' : order.preparationStatus === 'accepted' ? 'Start preparing' : 'Accept & prepare'}</button>}
+                {order.preparationStatus === 'new' && <button type="button" disabled={updatingOrder === order._id || pendingOrders.includes(order._id)} onClick={() => confirmToKitchen(order)}>{updatingOrder === order._id ? 'Sending…' : 'Confirm to kitchen'}</button>}
+                {order.preparationStatus === 'confirmed' && <><small className="guest-pickup-note">Confirmed by the counter · sent to the kitchen for {orderTableLabel(order)}</small><button type="button" disabled={updatingOrder === order._id || pendingOrders.includes(order._id)} onClick={() => startPreparation(order)}>{updatingOrder === order._id ? 'Starting…' : 'Start cooking'}</button></>}
                 {order.preparationStatus === 'preparing' && <><small className="guest-pickup-note">{getPreparationAction(order)} · food is being prepared</small><div className="cooking-progress" aria-label="Food preparation in progress"><i style={{ width: `${Math.min(100, Math.max(3, ((now - (Date.parse(order.preparingAt) || now)) / getPreparationTime(order)) * 100))}%` }} /></div></>}
                 {order.preparationStatus === 'ready' && <small className="guest-pickup-note">Placed on the counter · {orderTableLabel(order)} will collect it</small>}
-              </article>) : <div className="station-empty"><span>✓</span><strong>{orderFilter === 'all' ? 'All caught up' : `No ${orderFilter === 'new' ? 'new' : orderFilter} orders`}</strong><small>New table orders will appear here as they arrive.</small></div>}
+              </article>) : <div className="station-empty"><span>✓</span><strong>{orderFilter === 'all' ? 'All caught up' : `No ${orderFilter === 'new' ? 'new' : orderFilter} orders`}</strong><small>Paid table orders wait here until you confirm them for the kitchen.</small></div>}
             </div>
           </div>}
         </section>

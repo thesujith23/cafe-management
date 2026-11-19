@@ -160,6 +160,7 @@ const TablesTab = ({ tables, onFreeTable, onSeatTable, onShowStandee }) => {
                 <Link
                   to={`/table/${token}`}
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="p-2.5 rounded-2xl border border-thistle-700 hover:bg-lavender_blush-900/60 text-space_indigo-100 transition-colors"
                   title="Open this table's menu in a new tab"
                   aria-label={`Open the ${table.displayName} menu`}

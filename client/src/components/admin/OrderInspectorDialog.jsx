@@ -5,7 +5,7 @@ import { formatINR, formatTimeOnly } from '../../utils/formatters';
 import { guestName, orderTableCode, orderTableLabel } from '../../utils/orderDisplay';
 
 // Dishes can be ticked off while the ticket is still on the line.
-const TICKABLE_STATUSES = ['new', 'accepted', 'preparing', 'ready'];
+const TICKABLE_STATUSES = ['confirmed', 'accepted', 'preparing', 'ready'];
 const itemsDoneOf = (order) => (order?.items || []).filter((item) => item.isDone).length;
 
 /** The order drawer: table and customer, the recorded timeline, the dish ticks, and the actions. */
@@ -170,7 +170,7 @@ const OrderInspectorDialog = ({
             <span>Handover & Clear Board</span>
           </button>
         )}
-        {['new', 'preparing'].includes(order.preparationStatus) && (
+        {['new', 'confirmed', 'preparing'].includes(order.preparationStatus) && (
           <button
             onClick={() => {
               onCancelOrder(order._id);

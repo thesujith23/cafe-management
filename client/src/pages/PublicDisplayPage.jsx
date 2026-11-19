@@ -189,7 +189,7 @@ const PublicDisplayPage = () => {
           <div>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl font-bold font-tenez tracking-tight text-white m-0">
-                <ShinyText text="Little Window Café • Pickup Board" color="#ffffff" shineColor="#f2d6a0" speed={3} />
+                <ShinyText text="Little Window Café • Pickup Board" color="#ffffff" shineColor="#ffb29e" speed={3} />
               </h1>
               <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold font-aleo bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

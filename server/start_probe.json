@@ -1,0 +1,7 @@
+{
+  "appFileContainsStartImport": false,
+  "appFileContainsChatRoutesMount": true,
+  "appFileContainsListenCall": false,
+  "packageJsonHasStartScript": true,
+  "startScript": "node src/server.js"
+}

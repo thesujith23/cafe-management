@@ -1,0 +1,104 @@
+/* Privacy note and the route error boundary. Both are small, quiet pages on the
+   same cream paper as the rest of the café. */
+
+.lw-privacy {
+  min-height: 100svh;
+  background: #f3ebdd;
+  color: #2f4a3a;
+  padding: clamp(20px, 5vw, 56px) clamp(18px, 6vw, 72px) 80px;
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+}
+
+.lw-privacy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #e3d8c4;
+}
+
+.lw-privacy-brand,
+.lw-privacy-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #2f4a3a;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: .95rem;
+}
+
+.lw-privacy-brand span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2f4a3a;
+  color: #f3ebdd;
+}
+
+.lw-privacy-back { color: #6e6a5c; }
+.lw-privacy-back:hover { color: #2f4a3a; }
+
+.lw-privacy article {
+  max-width: 680px;
+  margin: clamp(28px, 6vw, 64px) auto 0;
+}
+
+.lw-privacy-eyebrow {
+  margin: 0 0 8px;
+  font-size: .74rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: #6e6a5c;
+}
+
+.lw-privacy h1 {
+  margin: 0 0 22px;
+  font-size: clamp(1.9rem, 4vw, 2.7rem);
+  line-height: 1.1;
+  letter-spacing: -.02em;
+}
+
+.lw-privacy h2 {
+  margin: 30px 0 8px;
+  font-size: 1.05rem;
+  letter-spacing: .01em;
+}
+
+.lw-privacy p {
+  margin: 0 0 12px;
+  line-height: 1.65;
+  color: #3d4f42;
+}
+
+.lw-route-error {
+  min-height: 60svh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  background: #f3ebdd;
+  color: #2f4a3a;
+}
+
+.lw-route-error h1 { margin: 0; font-size: 1.6rem; }
+.lw-route-error p { margin: 0; color: #6e6a5c; }
+
+.lw-route-error button {
+  justify-self: center;
+  margin-top: 6px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #ff7a5c;
+  color: #1b2c22;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lw-route-error button:hover { background: #c2412a; color: #fbf7ee; }

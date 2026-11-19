@@ -18,7 +18,7 @@ import MenuItemDialog from '../components/admin/MenuItemDialog';
 import ActionDialog from '../components/admin/ActionDialog';
 
 // Everything the counter still has to do something about.
-const ACTIVE_STATUSES = ['waiting_payment', 'new', 'accepted', 'preparing', 'ready'];
+const ACTIVE_STATUSES = ['waiting_payment', 'new', 'confirmed', 'accepted', 'preparing', 'ready'];
 
 const AdminDashboardPage = () => {
   const { user } = useAuth();
@@ -64,7 +64,7 @@ const AdminDashboardPage = () => {
       const [statsRes, ordersRes, tablesRes, menuRes, catRes] = await Promise.all([
         orderApi.getStats('today').catch(() => ({ success: false })),
         orderApi.getOrders({ limit: 50 }).catch(() => ({ success: false })),
-        tableApi.getTables().catch(() => ({ success: false })),
+        tableApi.getTablesManage().catch(() => ({ success: false })),
         menuApi.getMenuItems().catch(() => ({ success: false })),
         menuApi.getCategories().catch(() => ({ success: false })),
       ]);
@@ -269,7 +269,7 @@ const AdminDashboardPage = () => {
                 : o
             )
           );
-          await orderApi.cancelOrder(orderId, trimmed, true);
+          await orderApi.cancelOrder(orderId, trimmed);
         } catch (err) {
           console.error(err);
           loadDashboardData();
@@ -469,7 +469,7 @@ const AdminDashboardPage = () => {
           <div>
             <div className="flex items-center gap-2.5">
               <h1 className="text-2xl font-bold font-tenez text-space_indigo tracking-tight m-0">
-                <ShinyText text="Café Management Console" color="#192a51" shineColor="#967aa1" speed={3} />
+                <ShinyText text="Café Management Console" color="#2f4a3a" shineColor="#ff7a5c" speed={3} />
               </h1>
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-thistle-900 border border-thistle-700 text-space_indigo uppercase tracking-wider font-aleo">
                 {user?.role || 'Staff Mode'}

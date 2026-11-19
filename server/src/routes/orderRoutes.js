@@ -4,33 +4,40 @@ import {
   updateOrderStatus, updateOrderItem, getKitchenOrders, getDisplayOrders,
   getOrderTimeline, getOrderStats, getSalesReport, cancelOrder, clearOrder,
 } from '../controllers/orderController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect, authorize, optionalAuth } from '../middleware/auth.js';
 import validateQRToken from '../middleware/validateQR.js';
+import { validateBody } from '../middleware/validate.js';
+import { orderCreateSchema, orderCancelSchema, orderStatusSchema, orderItemSchema } from '../validators/schemas.js';
+import { orderLimiter } from '../middleware/limiters.js';
 
 const router = Router();
 
+const STAFF = ['owner', 'counter'];
+const WORKERS = ['owner', 'counter', 'kitchen'];
+
 // Customer routes (QR-validated)
-router.post('/token/:token', validateQRToken, createOrder);
+router.post('/token/:token', validateQRToken, orderLimiter, validateBody(orderCreateSchema), createOrder);
 router.get('/track/:token', getOrdersByToken);
 
-// Order cancellation (Customer 1-minute window / Staff override)
-router.patch('/:id/cancel', cancelOrder);
-router.delete('/:id', clearOrder);
-router.post('/:id/clear', clearOrder);
-
-// Public display
+// Public display board (sanitised payloads only)
 router.get('/display', getDisplayOrders);
 
-// Kitchen routes
-router.get('/kitchen', getKitchenOrders);
-
-// Admin & Order routes
-router.get('/stats', protect, authorize('owner', 'counter'), getOrderStats);
+// Staff boards
+router.get('/kitchen', protect, authorize(...WORKERS), getKitchenOrders);
+router.get('/stats', protect, authorize(...STAFF), getOrderStats);
 router.get('/reports', protect, authorize('owner'), getSalesReport);
-router.get('/', getOrders);
-router.get('/:id/timeline', getOrderTimeline);
-router.get('/:id', getOrder);
-router.patch('/:id/status', updateOrderStatus);
-router.patch('/:id/items/:itemId', updateOrderItem);
+router.get('/', protect, authorize(...WORKERS), getOrders);
+
+// Cancellation: a guest may cancel their own fresh order when they present the table
+// token; staff may cancel from the console. The old `isStaffOverride` body flag is no
+// longer trusted on its own.
+router.patch('/:id/cancel', optionalAuth, validateBody(orderCancelSchema), cancelOrder);
+router.delete('/:id', protect, authorize(...STAFF), clearOrder);
+router.post('/:id/clear', protect, authorize(...STAFF), clearOrder);
+
+router.get('/:id/timeline', protect, authorize(...WORKERS), getOrderTimeline);
+router.get('/:id', protect, authorize(...WORKERS), getOrder);
+router.patch('/:id/status', protect, authorize(...WORKERS), validateBody(orderStatusSchema), updateOrderStatus);
+router.patch('/:id/items/:itemId', protect, authorize(...WORKERS), validateBody(orderItemSchema), updateOrderItem);
 
 export default router;

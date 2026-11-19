@@ -1,16 +1,16 @@
 /* Little Window Café — the landing page is one room with a lit window in it. */
 
 .lwc-page {
-  --lwc-room: #0d211a;
-  --lwc-room-lift: #17392d;
-  --lwc-paper: #f3f1e6;
-  --lwc-ink: #12241d;
-  --lwc-muted: #5a685e;
-  --lwc-line: #d3d8c9;
-  --lwc-brass: #d8b578;
-  --lwc-brass-deep: #a9783f;
-  --lwc-leaf: #6d8a63;
-  --lwc-cream: #f7f2e2;
+  --lwc-room: #1b2c22;
+  --lwc-room-lift: #22382b;
+  --lwc-paper: #f3ebdd;
+  --lwc-ink: #2f4a3a;
+  --lwc-muted: #575245;
+  --lwc-line: #e3d8c4;
+  --lwc-brass: #ff7a5c;
+  --lwc-brass-deep: #c2412a;
+  --lwc-leaf: #41614d;
+  --lwc-cream: #fbf7ee;
   --lwc-display: var(--lw-display, 'Bricolage Grotesque', 'Arial Narrow', sans-serif);
   --lwc-text: var(--lw-text, 'Instrument Sans', 'Avenir Next', sans-serif);
   --lwc-mono: var(--lw-mono, 'DM Mono', ui-monospace, monospace);
@@ -173,7 +173,7 @@
 }
 
 .lwc-head-action:hover {
-  background: #e8cb94;
+  background: #e9dfca;
   transform: translateY(-1px);
 }
 
@@ -184,7 +184,7 @@
 }
 
 .lwc-head[data-solid='true'] .lwc-head-action:hover {
-  background: #23503f;
+  background: #2b523b;
 }
 
 .lwc-head-compact {
@@ -203,7 +203,7 @@
   padding: clamp(94px, 13vh, 158px) clamp(18px, 4vw, 58px) clamp(24px, 4vh, 44px);
   color: var(--lwc-cream);
   background:
-    radial-gradient(130% 100% at 84% 4%, #1e4738 0%, #123024 46%, var(--lwc-room) 74%, #071512 100%);
+    radial-gradient(130% 100% at 84% 4%, #264934 0%, #1a3224 46%, var(--lwc-room) 74%, #112218 100%);
 }
 
 .lwc-room-tint {
@@ -216,7 +216,7 @@
 
 .lwc-hero[data-light='golden'] .lwc-room-tint {
   opacity: 1;
-  background: radial-gradient(92% 74% at 78% 50%, rgba(216, 181, 120, 0.16), rgba(216, 181, 120, 0) 64%);
+  background: radial-gradient(92% 74% at 78% 50%, rgba(255, 122, 92, 0.16), rgba(255, 122, 92, 0) 64%);
 }
 
 .lwc-hero[data-light='morning'] .lwc-room-tint {
@@ -242,7 +242,7 @@
 
 .lwc-hero-note {
   max-width: 30ch;
-  color: #bcc9b8;
+  color: #b3c5ba;
   font-size: 13.5px;
   line-height: 1.5;
 }
@@ -271,7 +271,7 @@
 
 .lwc-hero-lede {
   max-width: 38ch;
-  color: #c6d2c3;
+  color: #b3c6bb;
   font-size: clamp(15px, 1.2vw, 17px);
   line-height: 1.62;
 }
@@ -303,7 +303,7 @@
 }
 
 .lwc-btn:hover {
-  background: #e8cb94;
+  background: #e9dfca;
   transform: translateY(-1px);
 }
 
@@ -330,7 +330,7 @@
   min-height: 50px;
   padding: 0 22px;
   overflow: hidden;
-  color: #fdf7e6;
+  color: #f2ecdf;
   background: linear-gradient(
     124deg,
     rgba(15, 36, 28, 0.93) 0%,
@@ -377,7 +377,7 @@
 }
 
 .lwc-window-enter:hover {
-  color: #fffdf2;
+  color: #f3eee2;
   border-color: rgba(246, 224, 178, 0.95);
 }
 
@@ -407,7 +407,7 @@
   height: 6px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: #f7e7c4;
+  background: #efe7d7;
   box-shadow: 0 0 10px 2px rgba(240, 216, 166, 0.62);
   animation: lwc-door-lamp 2.4s ease-in-out infinite;
 }
@@ -430,14 +430,14 @@
   100% {
     box-shadow:
       0 20px 34px -22px rgba(16, 28, 21, 0.95),
-      0 0 0 0 rgba(226, 199, 143, 0),
-      inset 0 0 0 1px rgba(226, 199, 143, 0.18);
+      0 0 0 0 rgba(255, 122, 92, 0),
+      inset 0 0 0 1px rgba(255, 122, 92, 0.18);
   }
 
   50% {
     box-shadow:
       0 22px 36px -22px rgba(16, 28, 21, 0.95),
-      0 0 30px 3px rgba(226, 199, 143, 0.34),
+      0 0 30px 3px rgba(255, 122, 92, 0.34),
       inset 0 0 0 1px rgba(240, 216, 166, 0.42);
   }
 }
@@ -533,8 +533,8 @@
   align-self: stretch;
   min-height: clamp(360px, 62vh, 620px);
   overflow: hidden;
-  background: #f4e3bb;
-  border: 1px solid rgba(216, 181, 120, 0.55);
+  background: #eee5d5;
+  border: 1px solid rgba(255, 122, 92, 0.55);
   border-radius: clamp(120px, 22vw, 300px) clamp(120px, 22vw, 300px) 4px 4px;
   box-shadow: 0 40px 90px rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(255, 255, 255, 0.16);
   isolation: isolate;
@@ -560,7 +560,7 @@
 .lwc-glass {
   position: absolute;
   inset: 0;
-  background: #efdfb2;
+  background: #ece3d1;
 }
 
 .lwc-sky {
@@ -571,15 +571,15 @@
 }
 
 .lwc-sky-golden {
-  background: linear-gradient(178deg, #f8ecc9 0%, #efdfb2 38%, #d8cb9c 66%, #9aa477 100%);
+  background: linear-gradient(178deg, #efe8d8 0%, #ece3d1 38%, #e9dec8 66%, #77a087 100%);
 }
 
 .lwc-sky-morning {
-  background: linear-gradient(178deg, #f7fbf2 0%, #e9f2e5 36%, #d3e2cb 64%, #9cb794 100%);
+  background: linear-gradient(178deg, #f7fbf2 0%, #f4f0e8 36%, #efe9de 64%, #92b39f 100%);
 }
 
 .lwc-sky-dusk {
-  background: linear-gradient(178deg, #f7dcae 0%, #eab884 34%, #c98d6b 62%, #6d5450 100%);
+  background: linear-gradient(178deg, #ede4d2 0%, #eab884 34%, #f0836b 62%, #6d5450 100%);
 }
 
 .lwc-hero[data-light='golden'] .lwc-sky-golden,
@@ -718,7 +718,7 @@
   width: clamp(74px, 9.5vw, 118px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: #fbf8ec;
+  background: #f2ece0;
   box-shadow: 0 20px 26px -16px rgba(48, 33, 16, 0.75), 0 3px 6px rgba(52, 38, 20, 0.16), inset 0 0 0 1px rgba(120, 100, 66, 0.2);
   transform: translate3d(0, var(--shift, 0px), 0);
   transition: transform 0.5s cubic-bezier(0.22, 0.75, 0.25, 1);
@@ -816,9 +816,9 @@
   max-width: calc(100% - 36px);
   margin: 0;
   padding: 9px 14px;
-  color: #f6f1de;
-  background: rgba(13, 33, 26, 0.9);
-  border: 1px solid rgba(216, 181, 120, 0.42);
+  color: #f1eadc;
+  background: rgba(27, 44, 34, 0.9);
+  border: 1px solid rgba(255, 122, 92, 0.42);
   border-radius: 2px;
   font-size: 11.5px;
   line-height: 1.3;
@@ -829,7 +829,7 @@
   width: 6px;
   height: 6px;
   flex: 0 0 auto;
-  background: #9dbf86;
+  background: #85ba99;
   border-radius: 50%;
   box-shadow: 0 0 0 4px rgba(157, 191, 134, 0.18);
   animation: lwc-blink 3.4s ease-in-out infinite;
@@ -876,8 +876,22 @@
 
 /* ---------- The pass ---------- */
 
+/* The pass pins itself: the wrapper supplies the scroll distance, the section stays
+   in place while the plate walks the rail, then the page carries on below it. */
+.lwc-pass-scroll {
+  position: relative;
+  height: 360vh;
+}
+
 .lwc-pass {
-  padding: clamp(52px, 9vh, 104px) clamp(18px, 4vw, 58px) clamp(56px, 10vh, 116px);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: clamp(34px, 7vh, 74px) clamp(18px, 4vw, 58px) clamp(30px, 6vh, 64px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
   background: var(--lwc-paper);
 }
 
@@ -887,7 +901,27 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px 40px;
-  margin-bottom: clamp(26px, 5vh, 48px);
+  margin-bottom: clamp(20px, 4vh, 42px);
+}
+
+/* The pinned pass has to fit one screen, so the plate view gives way first. */
+@media (max-height: 820px) and (min-width: 861px) {
+  .lwc-pass-head {
+    margin-bottom: 18px;
+  }
+
+  .lwc-pass-head p {
+    font-size: 13px;
+  }
+
+  .lwc-pass-body {
+    margin-top: 18px;
+    padding-top: 18px;
+  }
+
+  .lwc-pass-scene {
+    max-height: 40vh;
+  }
 }
 
 .lwc-pass-head h2 {
@@ -954,9 +988,9 @@
   width: 58px;
   height: 58px;
   margin: -29px 0 0 -29px;
-  background: radial-gradient(circle at 50% 42%, #fffdf5 0 62%, #ece3cd 63% 100%);
+  background: radial-gradient(circle at 50% 42%, #f4eee3 0 62%, #f3ede1 63% 100%);
   border-radius: 50%;
-  box-shadow: 0 0 0 1px #d3c6a8, 0 12px 22px rgba(18, 36, 29, 0.16);
+  box-shadow: 0 0 0 1px #e8deca, 0 12px 22px rgba(18, 36, 29, 0.16);
   transition: left 0.62s cubic-bezier(0.22, 0.8, 0.24, 1);
   pointer-events: none;
 }
@@ -964,11 +998,10 @@
 .lwc-plate i {
   width: 38px;
   height: 38px;
-  background-image: url('/images/cafe-food-montage.png');
-  background-size: 200% 200%;
-  background-position: 0 0;
+  background-size: cover;
+  background-position: center;
   border-radius: 50%;
-  transition: background-position 0.6s ease;
+  transition: background-image 0.3s ease;
 }
 
 .lwc-scrub {
@@ -1048,15 +1081,68 @@
   line-height: 1.68;
 }
 
+.lwc-stage-time {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  color: #a83521;
+  background: #efe7d8;
+  border: 1px solid #eae1cd;
+  border-radius: 2px;
+  font-family: var(--lwc-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lwc-stage-facts {
+  display: grid;
+  gap: 9px;
+  width: 100%;
+  max-width: 44ch;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.lwc-stage-facts > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 14px;
+  padding-top: 9px;
+  border-top: 1px dashed rgba(19, 54, 43, 0.16);
+}
+
+.lwc-stage-facts dt {
+  color: #7d7667;
+  font-family: var(--lwc-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lwc-stage-facts dd {
+  margin: 0;
+  color: var(--lwc-ink);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .lwc-stage-facts > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
+
 .lwc-signal {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   margin-top: 8px;
   padding: 8px 12px;
-  color: #35513b;
-  background: #e7ebdc;
-  border: 1px solid #d2d9c4;
+  color: #395845;
+  background: #f2ede4;
+  border: 1px solid #ede7da;
   border-radius: 2px;
   font-family: var(--lwc-mono);
   font-size: 10.5px;
@@ -1066,7 +1152,7 @@
 .lwc-signal i {
   width: 5px;
   height: 5px;
-  background: #6f8c56;
+  background: #4e7e61;
   border-radius: 50%;
 }
 
@@ -1074,29 +1160,26 @@
   position: relative;
   aspect-ratio: 16 / 11;
   overflow: hidden;
-  background: #ded8c2;
+  background: #ebe3d2;
   border-radius: 3px;
   isolation: isolate;
 }
 
+/* One photo per stop, stacked and cross-faded so only the plate travels the rail. */
 .lwc-scene-photo {
   position: absolute;
-  inset: -7%;
-  background-image: url('/images/cafe-food-montage.png');
-  background-size: 200% 200%;
-  background-position: 0 0;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   filter: saturate(0.94) contrast(1.02);
-  transform: scale(1.02);
-  transition: background-position 0.75s cubic-bezier(0.2, 0.75, 0.25, 1), transform 0.75s cubic-bezier(0.2, 0.75, 0.25, 1), filter 0.6s ease;
+  opacity: 0;
+  transition: opacity 0.55s ease;
 }
 
-.lwc-pass[data-stage='1'] .lwc-scene-photo { background-position: 100% 0; transform: scale(1.05); filter: saturate(0.86) brightness(0.94); }
-.lwc-pass[data-stage='2'] .lwc-scene-photo { background-position: 0 100%; transform: scale(1.07); filter: saturate(1) brightness(1.02); }
-.lwc-pass[data-stage='3'] .lwc-scene-photo { background-position: 100% 100%; transform: scale(1.03); }
-
-.lwc-pass[data-stage='1'] .lwc-plate i { background-position: 100% 0; }
-.lwc-pass[data-stage='2'] .lwc-plate i { background-position: 0 100%; }
-.lwc-pass[data-stage='3'] .lwc-plate i { background-position: 100% 100%; }
+.lwc-scene-photo.is-active {
+  opacity: 1;
+}
 
 .lwc-scene-tag {
   position: absolute;
@@ -1104,7 +1187,7 @@
   bottom: 12px;
   padding: 7px 11px;
   color: var(--lwc-cream);
-  background: rgba(13, 33, 26, 0.86);
+  background: rgba(27, 44, 34, 0.86);
   font-family: var(--lwc-mono);
   font-size: 10px;
   line-height: 1;
@@ -1183,7 +1266,7 @@
   bottom: 0;
   left: 0;
   padding: clamp(18px, 2.6vw, 30px);
-  color: #f6f3e6;
+  color: #f7f3ea;
   background: linear-gradient(rgba(7, 21, 18, 0), rgba(7, 21, 18, 0.82) 68%);
 }
 
@@ -1195,7 +1278,7 @@
 .lwc-panel-cap p {
   max-width: 26ch;
   margin-top: 7px;
-  color: #d3dbc9;
+  color: #eee8dc;
   font-size: 13.5px;
   line-height: 1.55;
   opacity: 0;
@@ -1224,10 +1307,10 @@
 
 .lwc-close {
   position: relative;
-  border-top: 1px solid rgba(216, 181, 120, 0.3);
+  border-top: 1px solid rgba(255, 122, 92, 0.3);
   padding: clamp(56px, 10vh, 120px) clamp(18px, 4vw, 58px) clamp(22px, 4vh, 34px);
   color: var(--lwc-cream);
-  background: radial-gradient(120% 110% at 12% 0%, #1d4738 0%, #112e24 52%, #071512 100%);
+  background: radial-gradient(120% 110% at 12% 0%, #254934 0%, #193022 52%, #112218 100%);
 }
 
 .lwc-close-main {
@@ -1254,7 +1337,7 @@
 
 .lwc-close-side p {
   max-width: 34ch;
-  color: #bcc9b8;
+  color: #b3c5ba;
   font-size: 14.5px;
   line-height: 1.65;
 }
@@ -1267,7 +1350,7 @@
   gap: 14px 26px;
   padding-top: 20px;
   border-top: 1px solid rgba(247, 242, 226, 0.18);
-  color: #9aa99b;
+  color: #aba598;
   font-size: 12.5px;
 }
 
@@ -1282,7 +1365,7 @@
   align-items: center;
   gap: 6px;
   min-height: 40px;
-  color: #dbe3d3;
+  color: #f0ebe1;
   text-decoration: none;
 }
 
@@ -1341,6 +1424,19 @@
 }
 
 @media (max-width: 860px) {
+  /* Phones stack the pass content, so it scrolls in flow instead of pinning. */
+  .lwc-pass-scroll {
+    height: auto;
+  }
+
+  .lwc-pass {
+    position: static;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding-block: 54px;
+  }
+
   .lwc-intro,
   .lwc-pass-body,
   .lwc-close-main {
@@ -1499,8 +1595,8 @@
 .lwc-light {
   display: flex;
   overflow: hidden;
-  background: rgba(13, 33, 26, 0.9);
-  border: 1px solid rgba(216, 181, 120, 0.42);
+  background: rgba(27, 44, 34, 0.9);
+  border: 1px solid rgba(255, 122, 92, 0.42);
   border-radius: 2px;
   backdrop-filter: blur(8px);
 }
@@ -1508,7 +1604,7 @@
 .lwc-light-btn {
   min-height: 34px;
   padding: 0 12px;
-  color: #cfd9cb;
+  color: #eee8dc;
   background: transparent;
   border: 0;
   border-left: 1px solid rgba(247, 242, 226, 0.16);
@@ -1528,7 +1624,7 @@
 }
 
 .lwc-light-btn[aria-pressed='true'] {
-  color: #1a2b24;
+  color: #1e3126;
   background: var(--lwc-brass);
   font-weight: 600;
 }
@@ -1556,9 +1652,9 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  background: #f2e2b8;
+  background: #ede5d4;
   clip-path: inset(var(--et, 0) var(--er, 0) var(--eb, 0) var(--el, 0) round var(--erad, 0) var(--erad, 0) 4px 4px);
-  transition: clip-path 0.8s cubic-bezier(0.66, 0, 0.22, 1);
+  transition: clip-path 0.72s cubic-bezier(0.66, 0, 0.22, 1);
 }
 
 .lwc-entry.is-expanded {
@@ -1572,7 +1668,7 @@
 .lwc-entry-sky {
   position: absolute;
   inset: 0;
-  background: linear-gradient(178deg, #f9edcb 0%, #efdfb2 38%, #d8cb9c 66%, #8fae8b 100%);
+  background: linear-gradient(178deg, #efe8d9 0%, #ece3d1 38%, #e9dec8 66%, #8aaa96 100%);
 }
 
 .lwc-entry-sky::after {
@@ -1589,8 +1685,8 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  background: radial-gradient(58% 48% at 50% 46%, #fffaf0 0%, rgba(255, 246, 214, 0.74) 46%, rgba(255, 246, 214, 0) 78%);
-  transition: opacity 0.5s ease;
+  background: radial-gradient(58% 48% at 50% 46%, #f3ede2 0%, rgba(255, 246, 214, 0.74) 46%, rgba(255, 246, 214, 0) 78%);
+  transition: opacity 0.42s cubic-bezier(0.3, 0.7, 0.3, 1);
 }
 
 .lwc-entry.is-bloom .lwc-entry-bloom {
@@ -1605,7 +1701,7 @@
   gap: 10px;
   width: min(520px, calc(100% - 48px));
   text-align: center;
-  color: #17362b;
+  color: #1e3a29;
   opacity: 0;
   transform: translate(-50%, -42%);
   transition: opacity 0.45s ease, transform 0.62s cubic-bezier(0.22, 0.75, 0.25, 1);
@@ -1618,7 +1714,7 @@
 }
 
 .lwc-entry-copy span {
-  color: #4c6152;
+  color: #4c6b58;
   font-family: var(--lwc-mono);
   font-size: 10.5px;
   letter-spacing: 0.04em;
@@ -1635,7 +1731,7 @@
 .lwc-close-foot .lwc-foot-link {
   min-height: 40px;
   padding: 0;
-  color: #dbe3d3;
+  color: #f0ebe1;
   background: none;
   border: 0;
   cursor: pointer;
@@ -1738,7 +1834,7 @@
 }
 
 .lwc-route-start {
-  fill: #fdf7e6;
+  fill: #f2ecdf;
   stroke: rgba(23, 54, 43, 0.5);
   stroke-width: 1.6;
   opacity: 0;
@@ -1746,8 +1842,8 @@
 }
 
 .lwc-route-dot {
-  fill: #b78c4d;
-  stroke: #fffaf0;
+  fill: #f4502b;
+  stroke: #f3ede2;
   stroke-width: 3;
   filter: drop-shadow(0 5px 9px rgba(60, 44, 20, 0.34));
   opacity: 0;
@@ -1765,13 +1861,13 @@
 }
 
 .lwc-route-end-inner {
-  fill: #17362b;
+  fill: #1e3a29;
   opacity: 0;
   animation: lwc-route-fade 0.4s ease 1.18s forwards;
 }
 
 .lwc-route-label {
-  fill: #4c6152;
+  fill: #4c6b58;
   font-family: var(--lwc-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -1837,5 +1933,20 @@
 
   .lwc-route-label {
     font-size: 24px;
+  }
+}
+
+/* With motion off, the pass simply scrolls: no pin, no plate travel. */
+@media (prefers-reduced-motion: reduce) {
+  .lwc-pass-scroll {
+    height: auto;
+  }
+
+  .lwc-pass {
+    position: static;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding-block: 54px;
   }
 }

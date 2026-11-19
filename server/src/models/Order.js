@@ -82,7 +82,7 @@ const orderSchema = new mongoose.Schema({
   },
   preparationStatus: {
     type: String,
-    enum: ['waiting_payment', 'new', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'],
+    enum: ['waiting_payment', 'new', 'confirmed', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'],
     default: 'waiting_payment',
   },
   payment: {
@@ -105,6 +105,7 @@ const orderSchema = new mongoose.Schema({
     trim: true,
   },
   acceptedAt: Date,
+  confirmedAt: Date,
   preparingAt: Date,
   readyAt: Date,
   completedAt: Date,

@@ -7,8 +7,8 @@ const TABLE_SPOTS = [
 const FALLBACK_TABLES = TABLE_SPOTS.map((_, index) => ({ tableId: `TBL-00${index + 1}`, displayName: `Table ${index + 1}`, status: 'available' }));
 const PALETTE = {
   ink: '#302820', wood: '#684a34', lightWood: '#a17b54', darkWood: '#3d3026',
-  sage: '#68725a', cream: '#e7dcc8', tile: '#a68a6b', steel: '#858984',
-  skin: '#c89170', ember: '#b96f3e', leaf: '#73795b', blue: '#617176',
+  sage: '#41614d', cream: '#f3ebdd', tile: '#a68a6b', steel: '#858984',
+  skin: '#c89170', ember: '#ff7a5c', leaf: '#4c6b52', blue: '#617176',
 };
 
 function makeMaterial(THREE, color, extra = {}) {
@@ -385,10 +385,14 @@ function setupDiningGuests(THREE, scene, tableMeshes) {
       fork.rotation.z = 0.18;
       const spoon = box(THREE, meal, 'guest-spoon', [0.025, 0.15, 0.018], [plateX + 0.29, 0.035, plateZ - 0.05], '#9b9a8c', { castShadow: false });
       spoon.rotation.z = -0.18;
+      meal.visible = false;
       record.group.add(meal);
       return person;
     });
     record.ambientDishes = record.group.children.filter((child) => child.name === 'guest-table-setting');
+    record.ambientDishes.forEach((dish) => {
+      dish.visible = false;
+    });
   });
 }
 
@@ -975,10 +979,9 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
     const combinedTables = [...FALLBACK_TABLES];
     const liveTables = new Map((dataRef.current.tables || []).map((table) => [table.tableId, table]));
     const currentOrders = dataRef.current.orders || {};
-    const activeTableIds = new Set([...(currentOrders.queued || []), ...(currentOrders.preparing || []), ...(currentOrders.ready || [])].map(orderTableId));
     const physicalTables = combinedTables.map((fallback) => {
       const table = { ...fallback, ...(liveTables.get(fallback.tableId) || {}) };
-      return activeTableIds.has(table.tableId) ? { ...table, status: 'occupied' } : table;
+      return table;
     });
     const tableMeshes = physicalTables.map((table, index) => createTable(THREE, scene, table, TABLE_SPOTS[index], index));
     setupDiningGuests(THREE, scene, tableMeshes);
@@ -1209,11 +1212,26 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
         }
       }
       const dineInOrders = [...(currentOrders.queued || []), ...(currentOrders.preparing || []), ...(currentOrders.ready || [])];
-      tableMeshes.forEach((record, tableIndex) => {
+      tableMeshes.forEach((record) => {
         const tableId = record.table.tableId;
         const tableShowcase = activeSceneFocus?.place === 'table' && activeSceneFocus.tableId === tableId;
         const liveTable = (dataRef.current.tables || []).find((table) => table.tableId === tableId);
-        record.reservedMarker.visible = tableIndex < 3 || (liveTable ? liveTable.status === 'reserved' : record.table.status === 'reserved');
+        const isOccupied = liveTable ? liveTable.status === 'occupied' : record.table.status === 'occupied';
+        const seatGuests = isOccupied || tableShowcase;
+        record.reservedMarker.visible = liveTable ? liveTable.status === 'reserved' : record.table.status === 'reserved';
+        // When a fresh table order arrives and nobody is yet walking to/from this table,
+        // start the guest pickup journey right away (not only when the order reaches Ready).
+        if (!seatGuests && !tableShowcase) {
+          const unresolvedHere = dineInOrders.find((order) => {
+            const id = String(order._id || order.orderNumber || order.displayOrderId);
+            const alreadyFinished = [...guestJourneys.values()].some((item) => item.id === id && item.phase === 'complete');
+            return orderTableId(order) === tableId && !completedJourneyIds.has(id) && !alreadyFinished;
+          });
+          if (unresolvedHere && ![...guestJourneys.values()].some((item) => item.tableId === tableId && item.phase !== 'complete')) {
+            const journeyAlreadyQueued = [...guestJourneys.values()].some((item) => item.tableId === tableId && item.phase === 'toCounter');
+            if (!journeyAlreadyQueued) beginGuestJourney(unresolvedHere, currentOrders.ready || [], time);
+          }
+        }
         const unresolvedOrders = dineInOrders.filter((order) => {
           const id = String(order._id || order.orderNumber || order.displayOrderId);
           const journeyFinished = [...guestJourneys.values()].some((item) => item.id === id && item.phase === 'complete');
@@ -1221,7 +1239,7 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
         });
         const journey = [...guestJourneys.values()].find((item) => item.tableId === tableId && item.phase !== 'complete');
         record.ambientGuests.forEach((guest, guestIndex) => {
-          guest.visible = !journey;
+          guest.visible = !journey && seatGuests;
           const diningStyle = guest.userData.diningStyle;
           const tempo = diningStyle === 'elder' ? 0.92 : diningStyle === 'child' ? 1.75 : tableShowcase ? 2.35 : 1.4;
           const phase = time * tempo + guest.userData.eatPhase;
@@ -1248,7 +1266,9 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
           }
           guest.position.y = Math.sin(phase * 0.5) * (diningStyle === 'child' ? 0.025 : 0.014);
         });
-        record.ambientDishes.forEach((dish) => { dish.visible = !journey; });
+        record.ambientDishes.forEach((dish) => { dish.visible = !journey && seatGuests; });
+        // The showcase dish mirrors the seated guests' plate setting so the table looks
+        // consistent with the people sitting at it during a table showcase.
         record.showcaseDish.visible = tableShowcase && !journey;
         if (record.guest) {
           if (journey) record.guest.visible = journey.phase === 'eat';
@@ -1363,12 +1383,22 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
           journey.phase = 'finishing';
           journey.customer.visible = false;
           journey.seatedGuest.visible = false;
-          Promise.resolve(dataRef.current.onGuestCompleted?.(journey.order)).then(() => {
+          // Only mark an order served for real fulfillments (ready orders that had a plate).
+          // Preview/journey demos for queued or preparing orders, and table showcases with no
+          // ready plate, complete silently so a freshly placed order can run its animation
+          // without hitting a status transition the API rejects from 'new'.
+          const orderReadyForFulfillment = !!(journey.order && journey.order.preparationStatus === 'ready');
+          if (orderReadyForFulfillment) {
+            Promise.resolve(dataRef.current.onGuestCompleted?.(journey.order)).then(() => {
+              completedJourneyIds.add(journey.id);
+              journey.phase = 'complete';
+            }).catch(() => {
+              guestJourneys.delete(journey.id);
+            });
+          } else {
             completedJourneyIds.add(journey.id);
             journey.phase = 'complete';
-          }).catch(() => {
-            guestJourneys.delete(journey.id);
-          });
+          }
         }
       });
 

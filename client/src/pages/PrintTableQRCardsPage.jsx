@@ -36,7 +36,7 @@ const PrintTableQRCardsPage = () => {
   const loadTables = async () => {
     try {
       setLoading(true);
-      const res = await tableApi.getTables();
+      const res = await tableApi.getTablesManage();
       if (res.success && res.data) {
         setTables(Array.isArray(res.data) ? res.data : (res.data.tables || []));
       }

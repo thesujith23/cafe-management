@@ -6,8 +6,8 @@
 export default function ShinyText({
   children,
   text,
-  color = '#192a51',
-  shineColor = '#ffffff',
+  color = '#2f4a3a',
+  shineColor = '#ffd3c7',
   spread = 120,
   speed = 3.5,
   className = '',

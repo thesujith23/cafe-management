@@ -6,6 +6,8 @@ import config from '../config/index.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { isDemoToken, demoTableFor } from '../middleware/validateQR.js';
+import { recordAudit } from '../utils/audit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +27,24 @@ const fallbackTables = [
   { _id: 'tbl_6', tableId: 'TBL-006', displayName: 'Table 6', capacity: 4, status: 'available', currentQrToken: { token: 'demo-token-TBL-006' }, reservation: null },
 ];
 
+// What a guest may know about a table: enough to pick a seat, never a QR token or a
+// guest's phone number.
+const publicTable = (table) => {
+  const plain = typeof table.toObject === 'function' ? table.toObject() : { ...table };
+  return {
+    _id: plain._id,
+    tableId: plain.tableId,
+    displayName: plain.displayName,
+    capacity: plain.capacity,
+    status: plain.status,
+    isActive: plain.isActive !== false,
+    activeOrders: (plain.activeOrders || []).map((order) => (order?._id || order)),
+    reservation: plain.reservation?.startsAt
+      ? { guests: plain.reservation.guests, startsAt: plain.reservation.startsAt }
+      : null,
+  };
+};
+
 // @desc    Get all tables
 // @route   GET /api/tables
 export const getTables = async (req, res, next) => {
@@ -37,7 +57,8 @@ export const getTables = async (req, res, next) => {
         table.reservation = null;
       }
     });
-    return res.json({ success: true, data: fallbackTables, tables: fallbackTables, isFallback: true });
+    const publicFallback = fallbackTables.map(publicTable);
+    return res.json({ success: true, data: publicFallback, tables: publicFallback, isFallback: true });
   }
 
   try {
@@ -60,10 +81,29 @@ export const getTables = async (req, res, next) => {
       if (io) tables.filter((table) => expiredReservations.some(({ _id }) => _id.equals(table._id)))
         .forEach((table) => io.emit('table:statusUpdate', table));
     }
-    res.json({ success: true, data: tables, tables });
+    const publicTables = tables.map(publicTable);
+    res.json({ success: true, data: publicTables, tables: publicTables });
   } catch (error) {
     console.warn('Notice: Database query in getTables failed, using fallback:', error.message);
-    res.json({ success: true, data: fallbackTables, tables: fallbackTables, isFallback: true });
+    const publicFallback = fallbackTables.map(publicTable);
+    res.json({ success: true, data: publicFallback, tables: publicFallback, isFallback: true });
+  }
+};
+
+// @desc    Full table documents for the staff console (includes QR tokens and contacts)
+// @route   GET /api/tables/manage
+export const getTablesManage = async (req, res, next) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.json({ success: true, data: fallbackTables, tables: fallbackTables, isFallback: true });
+    }
+    const tables = await DiningTable.find()
+      .populate('currentQrToken')
+      .populate('activeOrders')
+      .sort({ tableId: 1 });
+    res.json({ success: true, data: tables, tables });
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -170,22 +210,15 @@ export const getTable = async (req, res, next) => {
 export const validateTableToken = async (req, res, next) => {
   const { token } = req.params;
 
-  // Handle demo token directly
-  if (token && token.startsWith('demo-token-TBL-')) {
-    const numStr = token.replace('demo-token-TBL-00', '').replace('demo-token-TBL-0', '');
-    const num = parseInt(numStr, 10) || 1;
+  // Handle demo token directly (development only)
+  if (isDemoToken(token)) {
+    const demo = demoTableFor(token);
     return res.json({
       success: true,
       data: {
-        table: {
-          _id: `tbl_${num}`,
-          tableId: `TBL-00${num}`,
-          displayName: `Table ${num}`,
-          capacity: num === 3 ? 6 : num === 5 ? 8 : num === 4 ? 2 : 4,
-          status: 'available',
-        },
-        tableId: `TBL-00${num}`,
-        displayName: `Table ${num}`,
+        table: demo.table,
+        tableId: demo.tableId,
+        displayName: demo.displayName,
         token,
       },
     });
@@ -196,12 +229,13 @@ export const validateTableToken = async (req, res, next) => {
     if (!qrToken) {
       return res.status(401).json({ success: false, message: 'Invalid or expired QR code' });
     }
+    const table = publicTable(qrToken.table);
     res.json({
       success: true,
       data: {
-        table: qrToken.table,
-        tableId: qrToken.table.tableId,
-        displayName: qrToken.table.displayName,
+        table,
+        tableId: table.tableId,
+        displayName: table.displayName,
         token: qrToken.token,
       },
     });
@@ -253,6 +287,12 @@ export const generateQR = async (req, res, next) => {
       color: { dark: '#1a1a2e', light: '#ffffff' },
     });
 
+    recordAudit(req, 'table_qr_regenerated', {
+      targetModel: 'DiningTable',
+      targetId: table._id,
+      details: { tableId: table.tableId },
+    });
+
     res.json({
       success: true,
       data: {
@@ -295,10 +335,8 @@ export const checkinTable = async (req, res, next) => {
 
     let table = null;
 
-    if (token && token.startsWith('demo-token-TBL-')) {
-      const numStr = token.replace('demo-token-TBL-00', '').replace('demo-token-TBL-0', '');
-      const num = parseInt(numStr, 10) || 1;
-      const tableId = `TBL-00${num}`;
+    if (isDemoToken(token)) {
+      const tableId = demoTableFor(token).tableId;
 
       if (mongoose.connection.readyState === 1) {
         table = await DiningTable.findOne({ tableId });
@@ -316,14 +354,14 @@ export const checkinTable = async (req, res, next) => {
             checkedInAt: new Date(),
           };
           const io = req.app.get('io');
-          if (io) io.emit('table:statusUpdate', fb);
-          return res.json({ success: true, data: fb, message: 'Checked in successfully' });
+          if (io) io.emit('table:statusUpdate', publicTable(fb));
+          return res.json({ success: true, data: publicTable(fb), message: 'Checked in successfully' });
         }
       }
     } else {
-      const qrToken = await QRToken.findOne({ token, status: 'active' });
-      if (qrToken && qrToken.table) {
-        table = await DiningTable.findById(qrToken.table);
+      const qrToken = await QRToken.validateToken(token);
+      if (qrToken?.table) {
+        table = await DiningTable.findById(qrToken.table._id || qrToken.table);
       }
     }
 
@@ -347,12 +385,12 @@ export const checkinTable = async (req, res, next) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('table:statusUpdate', populatedTable || table);
+      io.emit('table:statusUpdate', publicTable(populatedTable || table));
     }
 
     res.json({
       success: true,
-      data: populatedTable || table,
+      data: publicTable(populatedTable || table),
       message: `Table ${table.displayName} checked in as Occupied`,
     });
   } catch (error) {
@@ -420,11 +458,18 @@ export const updateTableStatus = async (req, res, next) => {
       .populate('currentQrToken')
       .populate('activeOrders');
 
-    // Broadcast table status update in real time to all connected clients
+    // Broadcast table status update in real time to all connected clients. The public
+    // event carries the public shape only.
     const io = req.app.get('io');
     if (io) {
-      io.emit('table:statusUpdate', populatedTable || table);
+      io.emit('table:statusUpdate', publicTable(populatedTable || table));
     }
+
+    recordAudit(req, 'table_status_changed', {
+      targetModel: 'DiningTable',
+      targetId: table._id,
+      details: { tableId: table.tableId, status: table.status },
+    });
 
     res.json({ success: true, data: populatedTable || table });
   } catch (error) {

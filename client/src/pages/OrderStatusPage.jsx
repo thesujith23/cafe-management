@@ -188,9 +188,11 @@ const OrderStatusPage = () => {
     if (!confirmCancelOrder) return;
     try {
       setCancelling(true);
+      // The table token proves this order belongs to the guest holding the QR.
       const res = await orderApi.cancelOrder(
         confirmCancelOrder._id,
-        'Cancelled by customer within 1-minute window'
+        'Cancelled by customer within 1-minute window',
+        token
       );
 
       if (res.success) {
@@ -220,7 +222,10 @@ const OrderStatusPage = () => {
       case 'waiting_payment':
         return -1;
       case 'new':
+      case 'confirmed':
         return 0;
+      case 'accepted':
+        return 1;
       case 'preparing':
         return 1;
       case 'ready':
@@ -334,7 +339,8 @@ const OrderStatusPage = () => {
                     {isCompleted && <div className="order-complete-note"><CheckCircle2 size={15} />Enjoy your meal. Thanks for visiting.</div>}
                     {!isCancelled && !isCompleted && <div className="order-live-actions">
                       {canCancelOnline ? <button type="button" className="order-cancel-button" onClick={() => handleCancelClick(order)}><XCircle size={14} />Cancel order · {remainingCancelSeconds}s</button> : <button type="button" className="order-cancel-button is-muted" onClick={() => handleCancelClick(order)}><Store size={14} />Need to cancel?</button>}
-                      {order.preparationStatus === 'new' && <span>We’ve sent this to the café.</span>}
+                      {order.preparationStatus === 'new' && <span>Paid — waiting for the counter to check your order.</span>}
+                      {order.preparationStatus === 'confirmed' && <span>Checked at the counter — your ticket is with the kitchen.</span>}
                     </div>}
                     {!isCancelled && !isCompleted && cancelNotice && (
                       <p className="order-cancel-note">{cancelNotice}</p>

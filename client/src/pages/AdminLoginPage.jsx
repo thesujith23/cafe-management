@@ -2,8 +2,20 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { homeForRole } from '../utils/roleHome';
-import { Coffee, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
+import {
+  Coffee,
+  Lock,
+  Mail,
+  ArrowRight,
+  AlertCircle,
+  ChefHat,
+  ClipboardList,
+  Crown,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { DEMO_MODE } from '../utils/demoMode';
+import '../styles/login.css';
 
 const AdminLoginPage = () => {
   const navigate = useNavigate();
@@ -12,6 +24,7 @@ const AdminLoginPage = () => {
   // Demo builds arrive with a filled form; a real deployment starts empty.
   const [email, setEmail] = useState(DEMO_MODE ? 'admin@cafe.com' : '');
   const [password, setPassword] = useState(DEMO_MODE ? 'admin123' : '');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,128 +50,161 @@ const AdminLoginPage = () => {
   const fillQuickCredentials = (demoEmail, demoPass) => {
     setEmail(demoEmail);
     setPassword(demoPass);
+    setError('');
   };
 
   return (
-    <div className="pixel-screen pixel-login-screen min-h-screen bg-space_indigo-100 text-slate-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-futura selection:bg-dusty_mauve selection:text-white">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Brand */}
-        <Link to="/" className="flex flex-col items-center group">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-space_indigo to-dusty_mauve flex items-center justify-center text-white shadow-xl shadow-space_indigo/30 group-hover:scale-105 transition-all">
-            <Coffee className="w-8 h-8 stroke-2" />
-          </div>
-          <h2 className="mt-4 text-3xl font-bold font-tenez tracking-tight text-white">
-            Little Window Café · Staff Portal
-          </h2>
-          <p className="mt-1 text-xs text-thistle-500 font-aleo">
-            Staff & Management Console Access
-          </p>
+    <div className="staff-login">
+      {/* The room: brand, window and the three ways into service. */}
+      <section className="staff-login-brand" aria-label="Little Window Café staff">
+        <Link to="/" className="staff-login-wordmark">
+          <span><Coffee size={19} strokeWidth={1.8} /></span>
+          <span>
+            <strong>Little Window</strong>
+            <small>CAFÉ &amp; GARDEN</small>
+          </span>
         </Link>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-space_indigo-200/90 backdrop-blur-xl py-8 px-6 sm:px-10 rounded-3xl border border-space_indigo-400 shadow-2xl space-y-6">
+        <div className="staff-login-window" aria-hidden="true">
+          <span className="staff-login-steam"><i /><i /><i /></span>
+        </div>
+
+        <div className="staff-login-bottom">
+        <div className="staff-login-copy">
+          <p className="staff-login-kicker">Staff portal</p>
+          <h1>Service starts<br /><em>at the counter.</em></h1>
+          <p>
+            One door for the whole shift. Your account opens the counter, the kitchen pass
+            or the owner's console on its own.
+          </p>
+        </div>
+
+        <ul className="staff-login-roles">
+          <li>
+            <ClipboardList aria-hidden="true" />
+            <span><strong>Counter</strong>orders, tables &amp; the board</span>
+          </li>
+          <li>
+            <ChefHat aria-hidden="true" />
+            <span><strong>Kitchen</strong>the pass and the queue</span>
+          </li>
+          <li>
+            <Crown aria-hidden="true" />
+            <span><strong>Owner</strong>menu, reports, everything</span>
+          </li>
+        </ul>
+
+        <p className="staff-login-foot">Open today · 8:00 – 22:00 · six tables</p>
+        </div>
+      </section>
+
+      {/* The form. */}
+      <section className="staff-login-panel">
+        <div className="staff-login-card">
+          <div className="staff-login-card-head">
+            <h2>Sign in</h2>
+            <p>Staff &amp; management access</p>
+          </div>
+
+          <p className="staff-login-role-line">
+            <strong>Counter</strong> — orders &amp; tables · <strong>Kitchen</strong> — the queue ·{' '}
+            <strong>Owner</strong> — everything
+          </p>
+
           {error && (
-            <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-aleo">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <p className="staff-login-error" role="alert">
+              <AlertCircle size={14} aria-hidden="true" />
               <span>{error}</span>
-            </div>
+            </p>
           )}
 
-          {/* One form for every role — the account decides what opens next. */}
-          <p className="text-[11px] leading-relaxed text-thistle-500 font-aleo text-center px-1">
-            <strong className="text-thistle-300">Counter</strong> — orders &amp; tables ·{' '}
-            <strong className="text-thistle-300">Kitchen</strong> — the order queue ·{' '}
-            <strong className="text-thistle-300">Owner</strong> — everything
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-thistle-400 font-aleo mb-2">
-                Staff Email
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-thistle-500 absolute left-4 top-1/2 -translate-y-1/2" />
+          <form className="staff-login-form" onSubmit={handleSubmit}>
+            <div className="staff-login-field">
+              <label htmlFor="staff-email">Staff email</label>
+              <div className="staff-login-input">
+                <Mail size={15} aria-hidden="true" />
                 <input
+                  id="staff-email"
                   type="email"
                   required
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-space_indigo-100/90 border border-space_indigo-400 text-white text-sm focus:outline-hidden focus:border-dusty_mauve focus:ring-2 focus:ring-dusty_mauve/30 transition-all placeholder:text-thistle-600"
                   placeholder="admin@cafe.com"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-thistle-400 font-aleo mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-thistle-500 absolute left-4 top-1/2 -translate-y-1/2" />
+            <div className="staff-login-field">
+              <label htmlFor="staff-password">Password</label>
+              <div className="staff-login-input">
+                <Lock size={15} aria-hidden="true" />
                 <input
-                  type="password"
+                  id="staff-password"
+                  type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-space_indigo-100/90 border border-space_indigo-400 text-white text-sm focus:outline-hidden focus:border-dusty_mauve focus:ring-2 focus:ring-dusty_mauve/30 transition-all placeholder:text-thistle-600"
                   placeholder="••••••••"
+                  style={{ paddingRight: 42 }}
                 />
+                <button
+                  type="button"
+                  className="staff-login-reveal"
+                  onClick={() => setShowPassword((shown) => !shown)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-space_indigo via-dusty_mauve to-space_indigo hover:brightness-110 active:scale-98 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-space_indigo/30 transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <span>{loading ? 'Authenticating...' : 'Sign In to Dashboard'}</span>
-              <ArrowRight className="w-4 h-4" />
+            <button type="submit" className="staff-login-submit" disabled={loading}>
+              <span>{loading ? 'Signing in…' : 'Sign in to your shift'}</span>
+              <ArrowRight aria-hidden="true" />
             </button>
           </form>
 
-          {/* Quick Demo Credentials — local demos only */}
-          {DEMO_MODE && (<div className="pt-4 border-t border-space_indigo-400/50">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-thistle-500 font-aleo mb-3 text-center">
-              One-Click Demo Credentials
+          {DEMO_MODE && (
+            <div className="staff-login-demo">
+              <p>One-click demo accounts</p>
+              <div className="staff-login-demo-grid">
+                <button
+                  type="button"
+                  className="staff-login-demo-card"
+                  onClick={() => fillQuickCredentials('admin@cafe.com', 'admin123')}
+                >
+                  <Crown aria-hidden="true" />
+                  <b>Owner</b>
+                  <span>admin@cafe.com</span>
+                </button>
+                <button
+                  type="button"
+                  className="staff-login-demo-card"
+                  onClick={() => fillQuickCredentials('counter@cafe.com', 'counter123')}
+                >
+                  <ClipboardList aria-hidden="true" />
+                  <b>Counter</b>
+                  <span>counter@cafe.com</span>
+                </button>
+                <button
+                  type="button"
+                  className="staff-login-demo-card"
+                  onClick={() => fillQuickCredentials('kitchen@cafe.com', 'kitchen123')}
+                >
+                  <ChefHat aria-hidden="true" />
+                  <b>Kitchen</b>
+                  <span>kitchen@cafe.com</span>
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2.5">
-              <button
-                type="button"
-                onClick={() => fillQuickCredentials('admin@cafe.com', 'admin123')}
-                className="p-2.5 rounded-2xl bg-space_indigo-300/60 hover:bg-space_indigo-300 text-left border border-space_indigo-400 hover:border-dusty_mauve text-xs transition-all cursor-pointer shadow-2xs group"
-              >
-                <div className="font-bold text-dusty_mauve-600 font-aleo">Owner</div>
-                <div className="text-[10px] text-thistle-500 truncate">admin@cafe.com</div>
-              </button>
+          )}
 
-              <button
-                type="button"
-                onClick={() => fillQuickCredentials('counter@cafe.com', 'counter123')}
-                className="p-2.5 rounded-2xl bg-space_indigo-300/60 hover:bg-space_indigo-300 text-left border border-space_indigo-400 hover:border-thistle text-xs transition-all cursor-pointer shadow-2xs group"
-              >
-                <div className="font-bold text-thistle-300 font-aleo">Counter</div>
-                <div className="text-[10px] text-thistle-500 truncate">counter@cafe.com</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillQuickCredentials('kitchen@cafe.com', 'kitchen123')}
-                className="p-2.5 rounded-2xl bg-space_indigo-300/60 hover:bg-space_indigo-300 text-left border border-space_indigo-400 hover:border-emerald-400 text-xs transition-all cursor-pointer shadow-2xs group"
-              >
-                <div className="font-bold text-emerald-400 font-aleo">Kitchen</div>
-                <div className="text-[10px] text-thistle-500 truncate">kitchen@cafe.com</div>
-              </button>
-            </div>
-          </div>)}
+          <Link to="/" className="staff-login-back">← Return to the café floor</Link>
         </div>
-
-        <div className="mt-6 text-center">
-          <Link to="/" className="text-xs font-semibold font-aleo text-thistle-500 hover:text-white transition-colors">
-            ← Return to the café floor
-          </Link>
-        </div>
-      </div>
+      </section>
     </div>
   );
 };

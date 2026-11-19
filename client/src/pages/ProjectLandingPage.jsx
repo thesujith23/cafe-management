@@ -9,32 +9,56 @@ const PASS_STAGES = [
   {
     label: 'At your table',
     short: 'Seated',
+    time: '0–2 min',
     title: 'You choose, seated.',
-    body: 'Scan the card on your table, read the menu, and send your order without getting up. The cart shows the full bill before you pay.',
+    body: 'The card on your table opens the menu for that seat — not the whole room. Pick what you want, add a note if you need one, and see the full bill before you pay.',
+    facts: [
+      { key: 'You', value: 'Scan the card, choose, pay once.' },
+      { key: 'The room', value: 'Your table stays yours while you order.' },
+    ],
+    image: '/images/menu/weekend-brunch-platter.jpg',
     signal: 'Table 04 · menu open',
     scene: 'Your table',
   },
   {
     label: 'In the kitchen',
     short: 'Kitchen',
+    time: '6–9 min',
     title: 'Cooked when you order it.',
-    body: 'The ticket reaches the kitchen the moment it is paid for, with your notes and any extras. Nothing is started ahead of time.',
+    body: 'The ticket prints the moment the payment clears, with your notes and any extras. A cook accepts it and the timer starts — nothing is cooked ahead and nothing waits under a lamp.',
+    facts: [
+      { key: 'You', value: 'Nothing to do. Stay where you are.' },
+      { key: 'The kitchen', value: 'Accept, cook, plate — in that order.' },
+    ],
+    image: '/images/menu/paneer-tikka-masala.jpg',
     signal: 'Ticket 118 · cooking',
     scene: 'On the stove',
   },
   {
     label: 'At the pass',
     short: 'Pass',
-    title: 'Ready at the counter.',
-    body: 'The pass chimes and the screen by the counter calls your ticket. The same board shows what is cooking and what is waiting.',
+    time: 'Ready',
+    title: 'Called by ticket, not by queue.',
+    body: 'When the plate is dressed the pass marks the ticket ready. The screen above the counter calls that number, and the same board still shows everything cooking behind it.',
+    facts: [
+      { key: 'You', value: 'Watch for ticket 118 on the counter screen.' },
+      { key: 'The pass', value: 'One plate, checked, set down hot.' },
+    ],
+    image: '/images/menu/masala-dosa.jpg',
     signal: 'Ticket 118 · ready',
     scene: 'At the pass',
   },
   {
     label: 'Back with you',
     short: 'Served',
+    time: '1 min',
     title: 'Back at your table.',
-    body: 'Collect your plate and stay as long as you like. There is no queue at the counter and nothing left to settle.',
+    body: 'Collect your plate when it is called and take it back to your seat. The bill was settled with the order, so there is nothing left to ask for at the end.',
+    facts: [
+      { key: 'You', value: 'Collect, eat, stay as long as you like.' },
+      { key: 'The room', value: 'No queue, no second payment.' },
+    ],
+    image: '/images/menu/chicken-biryani.jpg',
     signal: 'Table 04 · served',
     scene: 'Back at the table',
   },
@@ -60,6 +84,7 @@ function ProjectLandingPage() {
   const rootRef = useRef(null);
   const windowRef = useRef(null);
   const entryTimers = useRef([]);
+  const passScrollRef = useRef(null);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [stage, setStage] = useState(0);
   const [light, setLight] = useState('golden');
@@ -156,9 +181,45 @@ function ProjectLandingPage() {
     };
   }, []);
 
+  // The pass holds the screen while the plate travels its rail: the wrapper is taller
+  // than the viewport, the section inside is sticky, and its scroll progress picks the
+  // stop. Once the wrapper ends, the page scrolls on as usual.
+  useEffect(() => {
+    const wrap = passScrollRef.current;
+    if (!wrap) return undefined;
+    let frame = 0;
+    const last = PASS_STAGES.length - 1;
+
+    const sync = () => {
+      frame = 0;
+      const rect = wrap.getBoundingClientRect();
+      const span = Math.max(1, rect.height - window.innerHeight);
+      const raw = -rect.top / span;
+      // Hold the first and last stop for a beat at either end of the pin.
+      const progress = Math.min(1, Math.max(0, (raw - 0.06) / 0.88));
+      const next = Math.min(last, Math.max(0, Math.round(progress * last)));
+      setStage((current) => (current === next ? current : next));
+    };
+
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(sync);
+    };
+
+    sync();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   useEffect(() => () => entryTimers.current.forEach(window.clearTimeout), []);
 
   const stepInside = () => {
+    // Warm the café chunk now, so the hand-over never waits on a lazy route.
+    import('./CafePage').catch(() => {});
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduceMotion || !windowRef.current) {
       navigate('/cafe', { state: { fromLandingRide: true } });
@@ -177,9 +238,10 @@ function ProjectLandingPage() {
       },
     });
     entryTimers.current = [
-      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'expanded' } : current)), 110),
-      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'bloom' } : current)), 1240),
-      window.setTimeout(() => navigate('/cafe', { state: { fromLandingRide: true } }), 1720),
+      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'expanded' } : current)), 60),
+      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'bloom' } : current)), 1060),
+      // Hand over while the mist is at its brightest, so the café opens out of the mist instead of a cut.
+      window.setTimeout(() => navigate('/cafe', { state: { fromLandingRide: true } }), 1500),
     ];
   };
 
@@ -366,10 +428,11 @@ function ProjectLandingPage() {
         </aside>
       </section>
 
+      <div className="lwc-pass-scroll" ref={passScrollRef}>
       <section className="lwc-pass" id="the-pass" data-stage={stage} aria-labelledby="lwc-pass-title">
         <div className="lwc-pass-head">
           <h2 id="lwc-pass-title">Follow one plate.</h2>
-          <p>Four moments between your chair and the pass. Drag the rail, or use the arrow keys, to move through them.</p>
+          <p>Four moments between your chair and the pass. Most tickets go from paid to ready in under ten minutes — drag the rail, or use the arrow keys, to follow one plate through.</p>
         </div>
 
         <div className="lwc-rail" style={{ '--p': stage / (PASS_STAGES.length - 1) }}>
@@ -380,7 +443,9 @@ function ProjectLandingPage() {
               <i key={step.label} style={{ left: `${(index / (PASS_STAGES.length - 1)) * 100}%` }} />
             ))}
           </div>
-          <div className="lwc-plate" aria-hidden="true"><i /></div>
+          <div className="lwc-plate" aria-hidden="true">
+            <i style={{ backgroundImage: `url(${active.image})` }} />
+          </div>
           <input
             className="lwc-scrub"
             type="range"
@@ -416,17 +481,36 @@ function ProjectLandingPage() {
 
         <div className="lwc-pass-body">
           <div className="lwc-pass-copy" aria-live="polite">
+            <span className="lwc-stage-time">{active.time}</span>
             <h3>{active.title}</h3>
             <p>{active.body}</p>
+            <dl className="lwc-stage-facts">
+              {active.facts.map((fact) => (
+                <div key={fact.key}>
+                  <dt>{fact.key}</dt>
+                  <dd>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
             <span className="lwc-signal"><i aria-hidden="true" />{active.signal}</span>
           </div>
           <div className="lwc-pass-scene">
-            <div className="lwc-scene-photo" />
+            {PASS_STAGES.map((step, index) => (
+              <div
+                key={step.image}
+                className={'lwc-scene-photo' + (index === stage ? ' is-active' : '')}
+                style={{ backgroundImage: `url(${step.image})` }}
+                role={index === stage ? 'img' : undefined}
+                aria-label={index === stage ? `${step.label}: ${step.scene}` : undefined}
+                aria-hidden={index === stage ? undefined : 'true'}
+              />
+            ))}
             <div className="lwc-cook" aria-hidden="true"><i /><i /><i /></div>
             <span className="lwc-scene-tag">{active.scene}</span>
           </div>
         </div>
       </section>
+      </div>
 
       <section className="lwc-gallery" aria-label="Food from the kitchen">
         {GALLERY.map((panel) => (
@@ -463,6 +547,7 @@ function ProjectLandingPage() {
               Café floor
             </button>
             <Link to="/admin/login">Staff sign in</Link>
+            <Link to="/privacy">Privacy</Link>
           </nav>
         </div>
       </section>

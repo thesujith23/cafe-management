@@ -205,10 +205,12 @@ const ItemDetailModal = ({ isOpen, onClose, item, onAddToCart }) => {
           <button
             type="button"
             onClick={handleAdd}
-            className="flex-1 flex items-center justify-between px-5 py-3 rounded-2xl bg-space_indigo hover:bg-space_indigo-400 active:scale-98 text-white font-bold text-xs tracking-wide shadow-lg shadow-space_indigo/25 transition-all cursor-pointer"
+            className="item-add-button"
+            aria-label={`Add ${item.name} to order for ${formatINR(totalPrice)}`}
           >
             <span>Add to Order</span>
-            <span className="font-extrabold text-xs bg-white/20 px-2.5 py-0.5 rounded-lg">{formatINR(totalPrice)}</span>
+            <span className="sr-only">, {formatINR(totalPrice)}</span>
+            <span aria-hidden="true">{formatINR(totalPrice)}</span>
           </button>
         </div>
       </div>

@@ -29,14 +29,14 @@ const OrderProgressCell = ({ order }) => {
         </span>
         <span className={'text-[10px] font-mono ' + (late ? 'text-rose-400 font-bold' : 'text-thistle-400')}>{clock}</span>
       </div>
-      <div className="mt-1.5 h-1.5 rounded-full bg-[#e4e7dd] overflow-hidden">
+      <div className="mt-1.5 h-1.5 rounded-full bg-[#e3d8c4] overflow-hidden">
         <div
           className="h-full rounded-full transition-[width] duration-700"
           style={{
             width: `${Math.max(3, percent)}%`,
             background: late
               ? 'linear-gradient(90deg, #fb7185, #fcd34d)'
-              : 'linear-gradient(90deg, #34d399, #2dd4bf)',
+              : 'linear-gradient(90deg, #41614d, #7fa672)',
           }}
         />
       </div>

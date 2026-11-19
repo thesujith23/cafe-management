@@ -1,0 +1,72 @@
+# Render blueprint: an Express API (Web Service) and the built Vite client (Static Site).
+# Replace the repo URL and set the secret values in the Render dashboard — never here.
+services:
+  - type: web
+    name: little-window-api
+    runtime: node
+    rootDir: server
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: CLIENT_URL
+        sync: false          # https://your-client.example.com
+      - key: CLIENT_URLS
+        sync: false          # optional comma separated allowlist (preview + custom domain)
+      - key: MONGODB_URI
+        sync: false          # MongoDB Atlas connection string
+      - key: JWT_SECRET
+        sync: false          # openssl rand -hex 48
+      - key: COOKIE_SECRET
+        sync: false
+      - key: QR_TOKEN_SECRET
+        sync: false
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DISPLAY_TOKEN
+        sync: false          # optional; locks the public TV room
+
+  - type: web
+    name: little-window-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https: wss:; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: Strict-Transport-Security
+        value: "max-age=31536000; includeSubDomains"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(self), microphone=(), geolocation=(), payment=(self)"

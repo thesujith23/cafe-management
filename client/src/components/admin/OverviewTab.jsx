@@ -21,7 +21,7 @@ const OverviewTab = ({ stats, orders, tables, onOpenTab, onInspectTable, onInspe
             </div>
             <div className="text-2xl sm:text-3xl font-black text-space_indigo font-futura tracking-tight">
               <CountUp
-                to={stats?.totalSales || 0}
+                to={stats?.todayRevenue ?? stats?.totalSales ?? 0}
                 prefix="₹"
                 duration={1.5}
               />
@@ -40,7 +40,7 @@ const OverviewTab = ({ stats, orders, tables, onOpenTab, onInspectTable, onInspe
             </div>
             <div className="text-2xl sm:text-3xl font-black text-space_indigo font-futura tracking-tight">
               <CountUp
-                to={stats?.orderCount || orders.length}
+                to={stats?.totalOrders ?? stats?.orderCount ?? orders.length}
                 duration={1.5}
               />
             </div>
@@ -56,7 +56,7 @@ const OverviewTab = ({ stats, orders, tables, onOpenTab, onInspectTable, onInspe
             </div>
             <div className="text-2xl sm:text-3xl font-black text-space_indigo font-futura tracking-tight">
               <CountUp
-                to={orders.filter((o) => ['new', 'preparing'].includes(o.preparationStatus)).length}
+                to={orders.filter((o) => ['confirmed', 'accepted', 'preparing'].includes(o.preparationStatus)).length}
                 duration={1.2}
               />
             </div>

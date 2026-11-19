@@ -45,7 +45,17 @@ export default function SmoothScroll({ children }) {
 
   // Handle route and hash navigation smoothly
   useEffect(() => {
-    if (!lenisRef.current) return;
+    const lenis = lenisRef.current;
+    if (!lenis) return;
+
+    // The 3D café is a fixed room with no page scroll: pause inertia there so wheel
+    // and touch input reach the scene untouched, and resume on the scrolling pages.
+    if (location.pathname === '/cafe') {
+      lenis.stop();
+      window.scrollTo(0, 0);
+      return;
+    }
+    lenis.start();
 
     if (location.hash) {
       const targetElement = document.querySelector(location.hash);
@@ -59,7 +69,7 @@ export default function SmoothScroll({ children }) {
     }
 
     // Scroll to top immediately on fresh route transition
-    lenisRef.current.scrollTo(0, { immediate: true });
+    lenis.scrollTo(0, { immediate: true });
   }, [location.pathname, location.hash]);
 
   return <>{children}</>;

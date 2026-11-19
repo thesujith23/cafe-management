@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/common/Navbar';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { orderApi } from '../api/apiServices';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
 import { getMinutesElapsed, formatTimeOnly } from '../utils/formatters';
 import { sounds } from '../utils/sound';
 import {
   ChefHat,
   Clock,
-  ArrowLeft,
   CheckCircle2,
   BellRing,
   Volume2,
@@ -16,45 +15,53 @@ import {
   RefreshCw,
   Flame,
   Check,
-  RotateCcw,
+  ArrowLeft,
+  ClipboardList,
+  LogOut,
+  UtensilsCrossed,
 } from 'lucide-react';
-import ShinyText from '../components/animations/ShinyText';
-import CreativeButton from '../components/animations/CreativeButton';
-import TiltedCard from '../components/animations/TiltedCard';
+import '../styles/kitchen.css';
 
 const COLUMNS = [
   {
-    id: 'new',
-    title: 'New & Accepted',
-    color: 'border-space_indigo-400 bg-space_indigo/10 text-space_indigo-700',
-    headerBg: 'bg-gradient-to-r from-space_indigo to-space_indigo-600',
-    badge: 'bg-space_indigo-100/60 text-space_indigo-800 border border-space_indigo-400',
+    id: 'confirmed',
+    title: 'Confirmed',
+    hint: 'At the pass · start when ready',
+    icon: ClipboardList,
+    action: 'Start cooking',
+    next: 'preparing',
+    empty: 'No tickets waiting',
   },
   {
     id: 'preparing',
-    title: 'In Preparation',
-    color: 'border-dusty_mauve-400 bg-dusty_mauve/10 text-dusty_mauve-700',
-    headerBg: 'bg-gradient-to-r from-dusty_mauve to-dusty_mauve-600',
-    badge: 'bg-dusty_mauve-100/60 text-dusty_mauve-800 border border-dusty_mauve-400',
+    title: 'In preparation',
+    hint: 'On the stove',
+    icon: Flame,
+    action: 'Mark ready',
+    next: 'ready',
+    empty: 'Nothing on the stove',
   },
   {
     id: 'ready',
-    title: 'Ready for Pickup',
-    color: 'border-emerald-500/40 bg-emerald-500/5 text-emerald-100',
-    headerBg: 'bg-gradient-to-r from-emerald-700 to-teal-800',
-    badge: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+    title: 'Ready to serve',
+    hint: 'Pick up and run it out',
+    icon: BellRing,
+    action: 'Mark served',
+    next: 'served',
+    empty: 'The pass is clear',
   },
 ];
 
 const KitchenKDSPage = () => {
-  const navigate = useNavigate();
-  const { socket, joinRoom } = useSocket();
+  const { socket, joinRoom, leaveRoom, isConnected } = useSocket();
+  const { logout } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [busyOrderId, setBusyOrderId] = useState(null);
+  const [now, setNow] = useState(() => new Date());
 
-  // Fetch kitchen orders
   const loadOrders = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -66,7 +73,7 @@ const KitchenKDSPage = () => {
         : (res?.data?.orders || res?.orders || []);
       setOrders(ordersList);
     } catch {
-      // Handle error
+      // The board keeps the last good list if a refresh fails.
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,22 +84,27 @@ const KitchenKDSPage = () => {
     loadOrders();
   }, []);
 
-  // Socket room and listeners
+  // The clock in the header and the "minutes on ticket" both tick from this.
   useEffect(() => {
-    if (!socket) return;
+    const timer = setInterval(() => setNow(new Date()), 20000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return undefined;
 
     joinRoom('kitchen');
 
     const handleNewOrder = (newOrder) => {
+      // A paid ticket reaches the kitchen only after the counter confirms it.
+      if (!['confirmed', 'accepted', 'preparing', 'ready'].includes(newOrder?.preparationStatus)) return;
       setOrders((prev) => {
         const exists = prev.some((o) => o._id === newOrder._id);
         if (exists) return prev;
         return [newOrder, ...prev];
       });
 
-      if (audioEnabled) {
-        sounds.playNewOrder();
-      }
+      if (audioEnabled) sounds.playNewOrder();
     };
 
     const handleStatusChanged = (data) => {
@@ -101,19 +113,13 @@ const KitchenKDSPage = () => {
       if (!orderId) return;
 
       setOrders((prev) => {
-        // If completed or cancelled, remove from active kitchen board
         if (status === 'completed' || status === 'served' || status === 'cancelled') {
           return prev.filter((ord) => ord._id !== orderId);
         }
-        return prev.map((ord) => {
-          if (ord._id === orderId) {
-            return {
-              ...ord,
-              preparationStatus: status,
-            };
-          }
-          return ord;
-        });
+        if (status === 'new' || status === 'waiting_payment') {
+          return prev.filter((ord) => ord._id !== orderId);
+        }
+        return prev.map((ord) => (ord._id === orderId ? { ...ord, preparationStatus: status } : ord));
       });
     };
 
@@ -128,10 +134,9 @@ const KitchenKDSPage = () => {
     };
   }, [socket, joinRoom, audioEnabled]);
 
-  // Update order status action
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      // Optimistic update
+      setBusyOrderId(orderId);
       setOrders((prev) => {
         if (newStatus === 'served' || newStatus === 'completed') {
           return prev.filter((o) => o._id !== orderId);
@@ -143,264 +148,226 @@ const KitchenKDSPage = () => {
     } catch (err) {
       console.error('Failed to update status:', err);
       loadOrders(true);
+    } finally {
+      setBusyOrderId(null);
     }
   };
 
-  return (
-    <div className="pixel-screen pixel-kitchen-screen min-h-screen bg-space_indigo-100 text-slate-100 flex flex-col font-futura selection:bg-dusty_mauve selection:text-white">
-      <Navbar />
+  const laneOrders = (id) => orders.filter((o) => (
+    id === 'confirmed'
+      ? o.preparationStatus === 'confirmed' || o.preparationStatus === 'accepted'
+      : o.preparationStatus === id
+  ));
 
-      {/* KDS Control Header */}
-      <div className="bg-space_indigo-200/95 border-b border-space_indigo-400/50 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 backdrop-blur-md">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-space_indigo to-dusty_mauve flex items-center justify-center text-white shadow-lg shadow-space_indigo/30">
-            <ChefHat className="w-6 h-6 stroke-2" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold font-tenez text-white tracking-tight m-0">
-              <ShinyText text="Kitchen Display Station (KDS)" color="#f5e6e8" shineColor="#d5c6e0" speed={3} />
-            </h1>
-            <p className="text-xs text-thistle-500 font-aleo mt-0.5">
-              Live Cooking Station • Instant sync with TV Display & Dining Tables
-            </p>
+  const counts = {
+    confirmed: laneOrders('confirmed').length,
+    preparing: laneOrders('preparing').length,
+    ready: laneOrders('ready').length,
+  };
+  const totalActive = counts.confirmed + counts.preparing + counts.ready;
+
+  return (
+    <div className="kds-screen">
+      <header className="kds-header">
+        <div className="kds-brand">
+          <span className="kds-brand-mark"><ChefHat aria-hidden="true" /></span>
+          <div className="kds-brand-text">
+            <strong>Kitchen display</strong>
+            <small>
+              <i className={'kds-live-dot' + (isConnected ? ' is-online' : '')} aria-hidden="true" />
+              {isConnected ? 'Service live' : 'Reconnecting'}
+            </small>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Audio Chime Toggle */}
+        <div className="kds-stats" aria-label="Live ticket counts">
+          <div className={'kds-stat is-coral' + (counts.confirmed ? ' is-alert' : '')}>
+            <ClipboardList aria-hidden="true" />
+            <b>{counts.confirmed}</b>
+            <span>Confirmed</span>
+          </div>
+          <div className="kds-stat">
+            <Flame aria-hidden="true" />
+            <b>{counts.preparing}</b>
+            <span>Cooking</span>
+          </div>
+          <div className="kds-stat is-ready">
+            <BellRing aria-hidden="true" />
+            <b>{counts.ready}</b>
+            <span>Ready</span>
+          </div>
+        </div>
+
+        <div className="kds-clock">
+          <Clock aria-hidden="true" />
+          <span>
+            {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {' · '}
+            {totalActive} {totalActive === 1 ? 'ticket' : 'tickets'} on the line
+          </span>
+        </div>
+
+        <div className="kds-actions">
           <button
+            type="button"
+            className={'kds-btn ' + (audioEnabled ? 'is-live' : 'is-muted')}
             onClick={() => setAudioEnabled((a) => !a)}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold font-aleo border transition-all cursor-pointer ${
-              audioEnabled
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 shadow-xs'
-                : 'bg-space_indigo-300/80 border-space_indigo-400 text-thistle-400'
-            }`}
+            aria-pressed={audioEnabled}
+            title={audioEnabled ? 'Mute the new-ticket chime' : 'Unmute the new-ticket chime'}
           >
-            {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            <span>{audioEnabled ? 'Sound Active' : 'Sound Muted'}</span>
+            {audioEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
+            <span>{audioEnabled ? 'Chime on' : 'Muted'}</span>
           </button>
 
-          {/* Refresh button */}
           <button
+            type="button"
+            className={'kds-btn' + (refreshing ? ' is-busy' : '')}
             onClick={() => loadOrders(true)}
             disabled={refreshing}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-space_indigo-300/80 hover:bg-space_indigo-300 border border-space_indigo-400 text-xs font-semibold font-aleo text-thistle-200 transition-colors cursor-pointer"
+            title="Refresh the board"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-dusty_mauve-600' : ''}`} />
+            <RefreshCw aria-hidden="true" />
             <span>Sync</span>
           </button>
 
+          <Link to="/cafe" className="kds-btn" title="Back to the café room">
+            <ArrowLeft aria-hidden="true" />
+            <span>Café floor</span>
+          </Link>
+
+          {/* Leave the kitchen room first: the socket stays authenticated until the
+              session ends, and a signed-out board must not keep live tickets. */}
           <button
-            onClick={() => navigate('/cafe')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-space_indigo-300/80 hover:bg-space_indigo-300 border border-space_indigo-400 text-xs font-semibold font-aleo text-thistle-200 transition-colors cursor-pointer"
+            type="button"
+            className="kds-btn is-exit"
+            onClick={() => {
+              leaveRoom('kitchen');
+              logout();
+            }}
+            aria-label="Sign out"
+            title="Sign out"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Café room</span>
+            <LogOut aria-hidden="true" />
+            <span>Sign out</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* 3-Column Kanban Board */}
-      <div className="flex-1 p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-x-auto">
-        {COLUMNS.map((col) => {
-          // 'accepted' lives in the same lane as brand-new tickets; without this it fell
-          // between the columns and the ticket disappeared from the board.
-          const colOrders = orders.filter((o) =>
-            col.id === 'new'
-              ? o.preparationStatus === 'new' || o.preparationStatus === 'accepted'
-              : o.preparationStatus === col.id
-          );
+      {loading ? (
+        <div className="kds-loading" role="status" aria-live="polite">
+          <UtensilsCrossed aria-hidden="true" />
+          <span>Setting the pass…</span>
+        </div>
+      ) : (
+        <div className="kds-board">
+          {COLUMNS.map((col, colIndex) => {
+            const list = laneOrders(col.id);
+            const ColumnIcon = col.icon;
 
-          return (
-            <div
-              key={col.id}
-              className="flex flex-col bg-space_indigo-200/90 rounded-3xl border border-space_indigo-400 overflow-hidden shadow-xl"
-            >
-              {/* Column Header */}
-              <div
-                className={`p-4 ${col.headerBg} text-white flex items-center justify-between font-bold text-sm shadow-xs`}
-              >
-                <span className="font-tenez text-base tracking-wide">{col.title}</span>
-                <span className="w-7 h-7 rounded-full bg-white/20 backdrop-blur-xs text-xs flex items-center justify-center font-extrabold font-futura">
-                  {colOrders.length}
-                </span>
-              </div>
-
-              {/* Column Orders List */}
-              <div className="flex-1 p-3.5 space-y-3.5 overflow-y-auto max-h-[calc(100vh-210px)]">
-                {colOrders.length === 0 ? (
-                  <div className="h-44 flex flex-col items-center justify-center text-xs text-thistle-500 italic font-aleo">
-                    <span>No orders in this stage</span>
+            return (
+              <section key={col.id} className={`kds-column is-${col.id}`} aria-label={col.title}>
+                <div className="kds-column-head">
+                  <span className="kds-column-icon"><ColumnIcon aria-hidden="true" /></span>
+                  <div>
+                    <h2>{col.title}</h2>
+                    <p>{col.hint}</p>
                   </div>
-                ) : (
-                  colOrders.map((order) => {
-                    const elapsed = getMinutesElapsed(order.createdAt);
-                    const isUrgent = elapsed >= (order.estimatedPrepTime || 15);
+                  <span className="kds-count">{list.length}</span>
+                </div>
 
-                    return (
-                      <TiltedCard
-                        key={order._id}
-                        maxRotation={5}
-                        scale={1.01}
-                        glare={true}
-                        spotlightColor="rgba(213, 198, 224, 0.25)"
-                      >
-                        <div
-                          className={`kitchen-ticket ${col.id === 'preparing' ? 'is-cooking' : col.id === 'ready' ? 'is-ready-ticket' : 'is-new-ticket'} bg-space_indigo-100/90 rounded-2xl border p-4 transition-all shadow-md ${
-                            isUrgent
-                              ? 'border-rose-500/80 ring-1 ring-rose-500/50'
-                              : 'border-space_indigo-400 hover:border-dusty_mauve'
-                          }`}
+                <div className="kds-column-body">
+                  {list.length === 0 ? (
+                    <div className="kds-empty">
+                      {col.id === 'ready' ? <CheckCircle2 aria-hidden="true" /> : <ColumnIcon aria-hidden="true" />}
+                      <strong>{col.empty}</strong>
+                      <span>
+                        {col.id === 'confirmed' && 'Confirmed tickets land here after the counter checks them.'}
+                        {col.id === 'preparing' && 'Start a ticket and it moves onto the stove.'}
+                        {col.id === 'ready' && 'Plated tickets wait here for the counter to run them out.'}
+                      </span>
+                    </div>
+                  ) : (
+                    list.map((order, index) => {
+                      const elapsed = getMinutesElapsed(order.createdAt);
+                      const isLate = elapsed >= (order.estimatedPrepTime || 15);
+                      const tableName = order.table?.displayName
+                        || (order.table?.tableId ? `Table ${order.table.tableId}` : 'Walk-in');
+                      const busy = busyOrderId === order._id;
+
+                      return (
+                        <article
+                          key={order._id}
+                          className={'kds-ticket' + (isLate ? ' is-late' : '')}
+                          style={{ animationDelay: `${Math.min(index, 4) * 45}ms` }}
                         >
-                        {/* Top meta */}
-                        <div className="flex items-center justify-between gap-2 pb-3 border-b border-space_indigo-400/50">
-                          <div>
-                            <span className="text-sm font-extrabold text-white font-futura tracking-tight">
-                              {order.orderNumber}
-                            </span>
-                            <div className="text-xs font-bold font-aleo text-dusty_mauve-600 mt-0.5">
-                              {order.table?.displayName || `Table ${order.tableId}`}
+                          <div className="kds-ticket-top">
+                            <div>
+                              <span className="kds-table">{tableName}</span>
+                              <span className="kds-order">
+                                {order.orderNumber}
+                                <span className="kds-order-dot" aria-hidden="true" />
+                                {formatTimeOnly(order.createdAt)}
+                                {order.preparationStatus === 'accepted' && (
+                                  <>
+                                    <span className="kds-order-dot" aria-hidden="true" />
+                                    Queued
+                                  </>
+                                )}
+                              </span>
                             </div>
-                          </div>
-
-                          <div className="text-right">
-                            <div
-                              className={`flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-lg font-futura ${
-                                isUrgent
-                                  ? 'bg-rose-500/20 text-rose-400 animate-pulse border border-rose-500/30'
-                                  : 'bg-space_indigo-300 text-thistle-200'
-                              }`}
-                            >
-                              <Clock className="w-3 h-3" />
-                              <span>{elapsed}m ago</span>
-                            </div>
-                            <span className="text-[10px] text-thistle-500 font-aleo block mt-0.5">
-                              {formatTimeOnly(order.createdAt)}
+                            <span className={'kds-time' + (isLate ? ' is-late' : '')}>
+                              <Clock aria-hidden="true" />
+                              {elapsed}m
                             </span>
                           </div>
-                        </div>
 
-                        {/* Items list */}
-                        <div className="py-3 space-y-2.5">
-                          {order.items?.map((item, idx) => (
-                            <div key={idx} className="text-xs bg-space_indigo-200/80 p-2.5 rounded-xl border border-space_indigo-400/50">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-start gap-2 flex-1 min-w-0">
-                                  {/* Veg / Non-Veg Indicator */}
-                                  <span
-                                    className={`w-3.5 h-3.5 mt-0.5 rounded-xs border flex items-center justify-center shrink-0 ${
-                                      item.isVeg !== false
-                                        ? 'border-emerald-500 bg-emerald-950/40'
-                                        : 'border-rose-500 bg-rose-950/40'
-                                    }`}
-                                    title={item.isVeg !== false ? 'Vegetarian' : 'Non-Vegetarian'}
-                                  >
-                                    <span
-                                      className={`w-1.5 h-1.5 rounded-full ${
-                                        item.isVeg !== false ? 'bg-emerald-400' : 'bg-rose-500'
-                                      }`}
-                                    />
+                          <ul className="kds-items">
+                            {order.items?.map((item, itemIndex) => (
+                              <li key={`${order._id}-${itemIndex}`}>
+                                <span className="kds-qty">{item.quantity}×</span>
+                                <span className="kds-item-name">{item.name}</span>
+                                {item.selectedSize?.name && (
+                                  <span className="kds-item-detail">Portion · {item.selectedSize.name}</span>
+                                )}
+                                {item.selectedAddons?.length > 0 && (
+                                  <span className="kds-item-detail">
+                                    + {item.selectedAddons.map((addon) => addon.name).join(', ')}
                                   </span>
+                                )}
+                                {item.specialInstructions && (
+                                  <em className="kds-item-note">Note: {item.specialInstructions}</em>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
 
-                                  <span className="font-extrabold text-dusty_mauve-600 font-mono text-sm shrink-0">
-                                    {item.quantity}x
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <span className="font-bold text-slate-100 font-aleo block truncate">{item.name}</span>
-                                    {item.selectedSize?.name && (
-                                      <span className="text-[10px] text-thistle-500 font-aleo block mt-0.5">
-                                        Portion: {item.selectedSize.name}
-                                      </span>
-                                    )}
-                                    {item.selectedAddons && item.selectedAddons.length > 0 && (
-                                      <span className="text-[10px] text-thistle-300 font-aleo block mt-0.5">
-                                        + {item.selectedAddons.map((a) => a.name).join(', ')}
-                                      </span>
-                                    )}
-                                    {item.specialInstructions && (
-                                      <span className="text-[11px] text-dusty_mauve-600 font-semibold block italic mt-0.5 bg-dusty_mauve/15 px-1.5 py-0.5 rounded border border-dusty_mauve/30">
-                                        Note: {item.specialInstructions}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Individual Prep Time */}
-                                <span className="shrink-0 text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-dusty_mauve/20 text-dusty_mauve-600 border border-dusty_mauve/30">
-                                  ⏱️ {item.prepTime || 15}m
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Customer Notes */}
-                        {order.customerNotes && (
-                          <div className="p-2.5 mb-3 rounded-xl bg-dusty_mauve/15 border border-dusty_mauve/30 text-[11px] text-thistle-200 font-aleo">
-                            <strong className="text-white">Table Note:</strong> {order.customerNotes}
-                          </div>
-                        )}
-
-                        {/* Action buttons with CreativeButton */}
-                        <div className="pt-2 border-t border-space_indigo-400/50 flex items-center gap-2">
-                          {col.id === 'new' && (
-                            <CreativeButton
-                              onClick={() => handleUpdateStatus(order._id, 'preparing')}
-                              variant="primary"
-                              size="md"
-                              magnetic={true}
-                              spark={true}
-                              sparkColor="#967aa1"
-                              icon={Flame}
-                              iconPosition="left"
-                              className="w-full shadow-md shadow-space_indigo/30"
-                            >
-                              Start Cooking
-                            </CreativeButton>
+                          {order.customerNotes && (
+                            <p className="kds-table-note">
+                              <strong>Table note:</strong> {order.customerNotes}
+                            </p>
                           )}
 
-                          {col.id === 'preparing' && (
-                            <CreativeButton
-                              onClick={() => handleUpdateStatus(order._id, 'ready')}
-                              variant="success"
-                              size="md"
-                              magnetic={true}
-                              spark={true}
-                              sparkColor="#10b981"
-                              icon={BellRing}
-                              iconPosition="left"
-                              className="w-full shadow-md shadow-emerald-600/30"
-                            >
-                              Mark as Ready
-                            </CreativeButton>
-                          )}
-
-                          {col.id === 'ready' && (
-                            <CreativeButton
-                              onClick={() => handleUpdateStatus(order._id, 'served')}
-                              variant="secondary"
-                              size="md"
-                              magnetic={true}
-                              spark={true}
-                              sparkColor="#d5c6e0"
-                              icon={Check}
-                              iconPosition="left"
-                              className="w-full bg-space_indigo-300 hover:bg-space_indigo-400 text-white border-space_indigo-400"
-                            >
-                              Mark Served
-                            </CreativeButton>
-                          )}
-                        </div>
-                      </div>
-                    </TiltedCard>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                          <button
+                            type="button"
+                            className="kds-action"
+                            onClick={() => handleUpdateStatus(order._id, col.next)}
+                            disabled={busy}
+                          >
+                            {col.id === 'confirmed' && <Flame aria-hidden="true" />}
+                            {col.id === 'preparing' && <BellRing aria-hidden="true" />}
+                            {col.id === 'ready' && <Check aria-hidden="true" />}
+                            {busy ? 'Updating…' : col.action}
+                          </button>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

@@ -20,7 +20,7 @@ export default function CreativeButton({
   magnetic = true,
   magneticStrength = 3.2,
   spark = true,
-  sparkColor = '#967aa1',
+  sparkColor = '#ff7a5c',
   sound = false,
   soundType = 'newOrder',
   className = '',
@@ -33,7 +33,7 @@ export default function CreativeButton({
   const buttonRef = useRef(null);
 
   // Variant styling mapped to our 5 luxury palette colors:
-  // space_indigo (#192a51), dusty_mauve (#967aa1), lilac_ash (#aaa1c8), thistle (#d5c6e0), lavender_blush (#f5e6e8)
+  // forest (#2f4a3a), coral (#ff7a5c), coral deep (#c2412a), cream line (#e3d8c4), cream (#f3ebdd)
   const variantStyles = {
     primary:
       'bg-gradient-to-r from-space_indigo via-dusty_mauve to-space_indigo bg-[length:200%_auto] hover:bg-[position:right_center] text-white shadow-lg shadow-space_indigo/25 border border-dusty_mauve/40 hover:border-dusty_mauve',

@@ -1,0 +1,7 @@
+{
+  "chatRoutePath": true,
+  "chatRouteReplyShape": true,
+  "envHasGroqKey": true,
+  "configExportsGroqApiKey": true,
+  "appMountsChatRoutes": true
+}

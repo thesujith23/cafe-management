@@ -5,7 +5,6 @@ import { orderApi, paymentApi } from '../../api/apiServices';
 import { useCart } from '../../context/CartContext';
 import { formatINR } from '../../utils/formatters';
 import { CreditCard, ShieldCheck, Sparkles, Loader2 } from 'lucide-react';
-import CreativeButton from '../animations/CreativeButton';
 import { DEMO_MODE } from '../../utils/demoMode';
 
 const PaymentModal = ({ isOpen, onClose }) => {
@@ -54,7 +53,7 @@ const PaymentModal = ({ isOpen, onClose }) => {
       }
 
       // Step 2: Create Payment Order
-      const paymentRes = await paymentApi.createPaymentOrder(createdOrder._id);
+      const paymentRes = await paymentApi.createPaymentOrder(createdOrder._id, token);
       if (!paymentRes.success || !paymentRes.data) {
         throw new Error(paymentRes.message || 'Failed to initialize payment');
       }
@@ -68,6 +67,7 @@ const PaymentModal = ({ isOpen, onClose }) => {
           razorpay_order_id: razorpayOrderId,
           razorpay_payment_id: `pay_demo_${Date.now()}`,
           razorpay_signature: 'demo_signature',
+          tableToken: token,
         });
 
         if (verifyRes.success) {
@@ -95,6 +95,7 @@ const PaymentModal = ({ isOpen, onClose }) => {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
+                tableToken: token,
               });
 
               if (verifyRes.success) {
@@ -111,7 +112,7 @@ const PaymentModal = ({ isOpen, onClose }) => {
             contact: customerInfo?.phone || '9999999999',
           },
           theme: {
-            color: '#ffa69e',
+            color: '#ff9277',
           },
         };
 
@@ -163,41 +164,29 @@ const PaymentModal = ({ isOpen, onClose }) => {
         {/* Payment CTA Buttons */}
         <div className="space-y-3 pt-2 guest-checkout-actions">
           {window.Razorpay && (
-            <CreativeButton
+            <button
               type="button"
               disabled={loading}
               onClick={() => handlePay(false)}
-              variant="primary"
-              size="lg"
-              magnetic={true}
-              spark={true}
-              sparkColor="#967aa1"
-              sound={true}
-              soundType="newOrder"
-              className="guest-pay-online w-full shadow-lg shadow-space_indigo/25"
+              className="guest-pay-online"
+              aria-label={loading ? 'Processing payment…' : `Pay ${formatINR(totalAmount)} online`}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <CreditCard className="w-4 h-4 text-white" />
+                <CreditCard className="w-4 h-4" />
               )}
               <span>Pay {formatINR(totalAmount)} Online</span>
-            </CreativeButton>
+            </button>
           )}
 
           {DEMO_MODE && (
-            <CreativeButton
+            <button
               type="button"
               disabled={loading}
               onClick={() => handlePay(true)}
-              variant={window.Razorpay ? 'secondary' : 'primary'}
-              size="lg"
-              magnetic={true}
-              spark={true}
-              sparkColor="#bf5e6b"
-              sound={true}
-              soundType="newOrder"
-              className="guest-pay-demo w-full shadow-md"
+              className="guest-pay-demo"
+              aria-label={loading ? 'Sending order…' : `Pay ${formatINR(totalAmount)} instantly (demo)`}
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -206,11 +195,11 @@ const PaymentModal = ({ isOpen, onClose }) => {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-thistle" />
+                  <Sparkles className="w-4 h-4" />
                   <span>Pay instantly — demo ({formatINR(totalAmount)})</span>
                 </span>
               )}
-            </CreativeButton>
+            </button>
           )}
 
           {!window.Razorpay && !DEMO_MODE && (

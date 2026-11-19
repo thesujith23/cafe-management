@@ -1,0 +1,8 @@
+app import ChatBubble: true
+app has ChatBubble usage: true
+app free of inline css assignment: true
+index.css exists: true
+index.css has chat styles: true
+server app has chatRoutes: true
+chat route file exists: true
+groq installed: true

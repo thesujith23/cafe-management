@@ -75,6 +75,37 @@ npm run dev      # Runs Vite dev server on http://localhost:5173
 
 ---
 
+## 🔒 Security & operations
+
+**Sessions**: staff sign in with a JWT held in an httpOnly cookie (`SameSite=Lax`, `Secure` in production). Passwords are bcrypt-hashed (cost 12); eight wrong attempts lock an account for 15 minutes. The login response never contains the token.
+
+**Authorization**: every staff write is behind `protect` + `authorize`.
+
+| Area | Who may call it |
+|---|---|
+| Order status, dish ticks, kitchen list, order reads | owner, counter, kitchen |
+| Order clearing, statistics, table QR/regeneration/status/clear, floor management | owner, counter |
+| Sales reports, staff accounts, settings | owner |
+| Menu reads, table identity/QR validation, check-in, reservations, order tracking by token, display board | public |
+
+Guests cancel through the table token that opened their menu; a body flag is not enough. Public table data never includes QR tokens or phone numbers, and public display payloads are stripped of guest contact details.
+
+**Sockets**: the handshake reads the same session cookie. Kitchen/admin rooms are role-gated, `order:*`/`token:*` rooms are pattern-checked, and the display board carries sanitised tickets (optionally locked with `DISPLAY_TOKEN`).
+
+**Payments**: amounts are computed server-side, the Razorpay signature is verified with HMAC, demo signatures only work with sandbox keys or outside production, and every create/verify call must present the table token that owns the order.
+
+**Abuse limits**: reads 300/15 min per IP, login 10/15 min, order creation 20/10 min, payments 30/15 min, chat 20/hour.
+
+**Production boot**: the server refuses to start with placeholder `JWT_SECRET`, `COOKIE_SECRET`, `QR_TOKEN_SECRET` or `MONGODB_URI`. Set `TRUST_PROXY=1` behind Render/Railway so rate limits and secure cookies see the real client.
+
+**Logs & audit**: JSON request logs with an `X-Request-Id` on every response; staff actions (order status, cancellation, clearing, table changes, QR regeneration, staff account edits) are written to `AuditLog`.
+
+**Tests**: `cd server && npm test` — a database-free access-control suite covering anonymous writes, the public table shape, the guest cancellation gate, and owner-only registration.
+
+**Deploy**: `render.yaml` describes the API Web Service and the static client (with CSP/HSTS headers). MongoDB Atlas handles persistence and backups. `Freebuff Sites`/Cloudflare Workers cannot host this Express + MongoDB app.
+
+---
+
 ## 🔑 Demo Login Credentials
 
 | Role | Email | Password | Access |

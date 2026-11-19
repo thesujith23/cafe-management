@@ -1,0 +1,57 @@
+
+[38;5;102mInstall with[0m npx skills add <owner/repo@skill>
+
+[38;5;145msamhvw8/dot-claude@backend-development[0m [36m76 installs[0m
+[38;5;102mΓöö https://skills.sh/samhvw8/dot-claude/backend-development[0m
+
+[38;5;145msamhvw8/dotfiles@backend-development[0m [36m46 installs[0m
+[38;5;102mΓöö https://skills.sh/samhvw8/dotfiles/backend-development[0m
+
+[38;5;145mlaskar-ksatria/building-observable-nodejs-api@nodejs-express-mongodb-backend-pattern[0m [36m35 installs[0m
+[38;5;102mΓöö https://skills.sh/laskar-ksatria/building-observable-nodejs-api/nodejs-express-mongodb-backend-pattern[0m
+
+[38;5;145mtechwithemmayt/techwithemma-skills@nodejs-scaffolding[0m [36m17 installs[0m
+[38;5;102mΓöö https://skills.sh/techwithemmayt/techwithemma-skills/nodejs-scaffolding[0m
+
+[38;5;145mskills.volces.com@Skills for openclaw[0m [36m11 installs[0m
+[38;5;102mΓöö https://skills.sh/skills.volces.com/fullstack-developer[0m
+
+[38;5;145mwyc7758775/aglie-person-manage@fullstack-developer[0m [36m11 installs[0m
+[38;5;102mΓöö https://skills.sh/wyc7758775/aglie-person-manage/fullstack-developer[0m
+
+[38;5;145mavinashskaranth/db-model-router@db-model-router[0m [36m8 installs[0m
+[38;5;102mΓöö https://skills.sh/avinashskaranth/db-model-router/db-model-router[0m
+
+[38;5;145mhyperb1iss/hyperskills@fullstack[0m [36m5 installs[0m
+[38;5;102mΓöö https://skills.sh/hyperb1iss/hyperskills/fullstack[0m
+
+[38;5;145mshajar5110/hackathon-ii-phase-3@backend-ultimate[0m [36m5 installs[0m
+[38;5;102mΓöö https://skills.sh/shajar5110/hackathon-ii-phase-3/backend-ultimate[0m
+
+[38;5;145mendorphin-ai/claude-code-teams@backend-mean[0m [36m2 installs[0m
+[38;5;102mΓöö https://skills.sh/endorphin-ai/claude-code-teams/backend-mean[0m
+
+[38;5;145mclawhub.ai@fullstack-developer[0m [36m2 installs[0m
+[38;5;102mΓöö https://skills.sh/clawhub.ai/fullstack-developer[0m
+
+[38;5;145mlaskar-ksatria/building-observable-nodejs-api@nodejs-express-backend-pattern[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/laskar-ksatria/building-observable-nodejs-api/nodejs-express-backend-pattern[0m
+
+[38;5;145msmithery.ai@fullstack[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/smithery.ai/fullstack[0m
+
+[38;5;145mashutosh5hukla/marketplace@MarketPlace[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/ashutosh5hukla/marketplace/marketplace[0m
+
+[38;5;145mlaskar-ksatria/building-observable-nodejs-api@building-observable-nodejs-api[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/laskar-ksatria/building-observable-nodejs-api/building-observable-nodejs-api[0m
+
+[38;5;145mmetehankurucu/litemetrics@litemetrics[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/metehankurucu/litemetrics/litemetrics[0m
+
+[38;5;145msmithery.ai@backend-ultimate[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/smithery.ai/backend-ultimate[0m
+
+[38;5;145mshajar5110/hackathon-ii-phase2@backend-ultimate[0m [36m1 install[0m
+[38;5;102mΓöö https://skills.sh/shajar5110/hackathon-ii-phase2/backend-ultimate[0m
+
