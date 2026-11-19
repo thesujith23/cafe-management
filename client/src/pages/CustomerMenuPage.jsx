@@ -10,7 +10,7 @@ import { useCart } from '../context/CartContext';
 import { formatINR } from '../utils/formatters';
 import {
   Search,
-  ShoppingBag,
+  ShoppingCart,
   AlertCircle,
   Loader2,
   Coffee,
@@ -239,7 +239,7 @@ const CustomerMenuPage = () => {
         <div className="order-table-chip"><span>Ordering at</span><strong>{tableLabel}</strong></div>
         <div className="order-header-actions">
           <Link to={`/track/${token}`} className="order-track-link"><Clock3 size={16} /><span>My orders</span></Link>
-          <button type="button" className="order-header-cart" onClick={() => setIsCartOpen(true)} aria-label={`Open cart, ${itemCount} items`}><ShoppingBag size={17} /><span>Cart</span><b>{itemCount}</b></button>
+          <button type="button" className="order-header-cart" onClick={() => setIsCartOpen(true)} aria-label={`Open cart, ${itemCount} items`}><ShoppingCart size={17} /><span>Cart</span><b>{itemCount}</b></button>
         </div>
       </header>
 

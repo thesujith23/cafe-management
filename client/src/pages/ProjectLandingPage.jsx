@@ -114,34 +114,61 @@ function ProjectLandingPage() {
     const root = rootRef.current;
     const head = root?.querySelector('.lwc-head');
     const hero = root?.querySelector('.lwc-hero');
-    const layers = Array.from(root?.querySelectorAll('[data-parallax]') || []);
+    const layers = Array.from(root?.querySelectorAll('[data-parallax]') || []).map((layer) => ({
+      element: layer,
+      host: layer.parentElement,
+      speed: Number(layer.dataset.parallax) || 0,
+    }));
+    const pass = passScrollRef.current;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let frame = 0;
+    const lastStage = PASS_STAGES.length - 1;
 
     const paint = () => {
       frame = 0;
       const y = window.scrollY;
-      if (head) head.dataset.solid = y > 92 ? 'true' : 'false';
-      if (!hero) return;
-      const progress = Math.min(1, Math.max(0, y / Math.max(1, hero.offsetHeight)));
-      hero.style.setProperty('--hero-p', progress.toFixed(4));
-      if (reduceMotion) return;
+      const viewportHeight = window.innerHeight;
+      const heroHeight = hero?.offsetHeight || 1;
+      const layerRects = reduceMotion
+        ? []
+        : layers.map(({ element, host, speed }) => {
+          if (!host) return null;
+          const rect = host.getBoundingClientRect();
+          return { element, speed, top: rect.top, bottom: rect.bottom, height: rect.height };
+        });
+      const passRect = pass?.getBoundingClientRect();
 
-      const middle = window.innerHeight / 2;
-      layers.forEach((layer) => {
-        const host = layer.parentElement;
-        if (!host) return;
-        const rect = host.getBoundingClientRect();
-        if (rect.bottom < -200 || rect.top > window.innerHeight + 200) return;
-        const speed = Number(layer.dataset.parallax) || 0;
-        const shift = -(rect.top + rect.height / 2 - middle) * speed;
-        layer.style.setProperty('--shift', `${shift.toFixed(1)}px`);
-      });
+      if (head) {
+        const isSolid = y > 92;
+        if ((head.dataset.solid === 'true') !== isSolid) {
+          head.dataset.solid = String(isSolid);
+        }
+      }
+
+      if (hero && !reduceMotion) {
+        const progress = Math.min(1, Math.max(0, y / heroHeight));
+        hero.style.setProperty('--hero-p', progress.toFixed(4));
+      }
+
+      if (!reduceMotion) {
+        const middle = viewportHeight / 2;
+        layerRects.forEach((layer) => {
+          if (!layer || layer.bottom < -200 || layer.top > viewportHeight + 200) return;
+          const shift = -(layer.top + layer.height / 2 - middle) * layer.speed;
+          layer.element.style.setProperty('--shift', `${shift.toFixed(1)}px`);
+        });
+      }
+
+      if (passRect) {
+        const span = Math.max(1, passRect.height - viewportHeight);
+        const raw = -passRect.top / span;
+        const progress = Math.min(1, Math.max(0, (raw - 0.06) / 0.88));
+        const next = Math.min(lastStage, Math.max(0, Math.round(progress * lastStage)));
+        setStage((current) => (current === next ? current : next));
+      }
     };
 
-    const onScroll = () => {
-      if (!frame) frame = window.requestAnimationFrame(paint);
-    };
+    const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(paint); };
 
     paint();
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -178,40 +205,6 @@ function ProjectLandingPage() {
     return () => {
       scene.removeEventListener('pointermove', move);
       scene.removeEventListener('pointerleave', reset);
-    };
-  }, []);
-
-  // The pass holds the screen while the plate travels its rail: the wrapper is taller
-  // than the viewport, the section inside is sticky, and its scroll progress picks the
-  // stop. Once the wrapper ends, the page scrolls on as usual.
-  useEffect(() => {
-    const wrap = passScrollRef.current;
-    if (!wrap) return undefined;
-    let frame = 0;
-    const last = PASS_STAGES.length - 1;
-
-    const sync = () => {
-      frame = 0;
-      const rect = wrap.getBoundingClientRect();
-      const span = Math.max(1, rect.height - window.innerHeight);
-      const raw = -rect.top / span;
-      // Hold the first and last stop for a beat at either end of the pin.
-      const progress = Math.min(1, Math.max(0, (raw - 0.06) / 0.88));
-      const next = Math.min(last, Math.max(0, Math.round(progress * last)));
-      setStage((current) => (current === next ? current : next));
-    };
-
-    const onScroll = () => {
-      if (!frame) frame = window.requestAnimationFrame(sync);
-    };
-
-    sync();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-      if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
 
