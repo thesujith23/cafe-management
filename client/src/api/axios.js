@@ -1,11 +1,13 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const backendUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/+$/, '');
+
 // Every service in apiServices.js passes a path that starts at the API root
 // (e.g. '/tables/token/...'), and the Express app mounts all routes under /api.
 // The Vite dev server proxies /api -> http://localhost:5000.
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: backendUrl ? `${backendUrl}/api` : '/api',
   withCredentials: true,
 });
 
