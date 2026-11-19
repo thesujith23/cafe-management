@@ -29,6 +29,8 @@ const qrTokenSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+qrTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 // Generate a secure random token
 qrTokenSchema.statics.generateToken = function () {
   return crypto.randomBytes(32).toString('hex');

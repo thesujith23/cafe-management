@@ -31,6 +31,14 @@ export const orderLimiter = rateLimit({
   message: message('That is a lot of orders at once. Please wait a moment.'),
 });
 
+export const virtualTableLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: message('Too many virtual table sessions. Please try again later.'),
+});
+
 export const paymentLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,

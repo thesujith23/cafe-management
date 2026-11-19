@@ -96,13 +96,15 @@ Guests cancel through the table token that opened their menu; a body flag is not
 
 **Abuse limits**: reads 300/15 min per IP, login 10/15 min, order creation 20/10 min, payments 30/15 min, chat 20/hour.
 
+**Virtual café tables**: selecting a table in the 3D café creates a random, table-scoped ordering token that expires after two hours. Physical QR codes continue to use their own tokens.
+
 **Production boot**: the server refuses to start with placeholder `JWT_SECRET`, `COOKIE_SECRET`, `QR_TOKEN_SECRET` or `MONGODB_URI`. Set `TRUST_PROXY=1` behind Render/Railway so rate limits and secure cookies see the real client.
 
 **Logs & audit**: JSON request logs with an `X-Request-Id` on every response; staff actions (order status, cancellation, clearing, table changes, QR regeneration, staff account edits) are written to `AuditLog`.
 
 **Tests**: `cd server && npm test` — a database-free access-control suite covering anonymous writes, the public table shape, the guest cancellation gate, and owner-only registration.
 
-**Deploy**: `render.yaml` describes the API Web Service and the static client (with CSP/HSTS headers). MongoDB Atlas handles persistence and backups. `Freebuff Sites`/Cloudflare Workers cannot host this Express + MongoDB app.
+**Deploy**: deploy the API from `server` on Render and the Vite app from `client` on Vercel. Set `VITE_BACKEND_URL` to the Render API origin and configure Render's `CLIENT_URL`/`CLIENT_URLS` with the exact Vercel origin. Use `NODE_ENV=production`, `TRUST_PROXY=1`, `COOKIE_SAMESITE=none`, and `COOKIE_SECURE=true` for the separate Vercel/Render domains; the production cookie defaults to `SameSite=None; Secure`. `client/vercel.json` sends browser routes such as `/table/:token` back to the SPA. `render.yaml` remains available for an all-Render deployment. MongoDB Atlas handles persistence and backups.
 
 ---
 

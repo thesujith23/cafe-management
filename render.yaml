@@ -27,7 +27,7 @@ services:
       - key: QR_TOKEN_SECRET
         sync: false
       - key: COOKIE_SAMESITE
-        value: lax
+        value: none
       - key: COOKIE_SECURE
         value: "true"
       - key: RAZORPAY_KEY_ID
@@ -47,6 +47,9 @@ services:
     rootDir: client
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
+    envVars:
+      - key: VITE_BACKEND_URL
+        sync: false          # https://your-api.onrender.com
     routes:
       - type: rewrite
         source: /*

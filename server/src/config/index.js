@@ -103,7 +103,7 @@ const config = {
   qrTokenSecret,
   cookie: {
     maxAgeMs: 7 * 24 * 60 * 60 * 1000,
-    sameSite: process.env.COOKIE_SAMESITE || 'lax',
+    sameSite: process.env.COOKIE_SAMESITE || (isProduction ? 'none' : 'lax'),
     secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : isProduction,
   },
   // Optional shared key for a public TV board. When unset the display room stays open

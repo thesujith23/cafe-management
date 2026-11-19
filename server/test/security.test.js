@@ -48,6 +48,14 @@ test('public floor map never leaks QR tokens or guest contact details', async ()
   assert.ok(!raw.includes('customerPhone'), 'public tables must not expose phone numbers');
 });
 
+test('virtual table tokens reject invalid ids and fail closed without MongoDB', async () => {
+  const invalid = await call('/api/tables/not-a-table/virtual-token', { method: 'POST' });
+  assert.equal(invalid.status, 400);
+
+  const unavailable = await call('/api/tables/TBL-001/virtual-token', { method: 'POST' });
+  assert.equal(unavailable.status, 503);
+});
+
 test('order writes require a staff session', async () => {
   const status = await call('/api/orders/651111111111111111111111/status', {
     method: 'PATCH',

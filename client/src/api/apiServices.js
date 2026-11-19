@@ -24,6 +24,7 @@ export const tableApi = {
   getTablesManage: () => api.get('/tables/manage'),
   getTable: (id) => api.get(`/tables/${id}`),
   validateToken: (token) => api.get(`/tables/token/${token}`),
+  createVirtualToken: (tableId) => api.post(`/tables/${tableId}/virtual-token`),
   generateQR: (id) => api.post(`/tables/${id}/qr`),
   updateStatus: (id, status, extraData = {}) => api.patch(`/tables/${id}/status`, { status, ...extraData }),
   checkin: (token, data) => api.post(`/tables/checkin/${token}`, data),

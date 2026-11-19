@@ -98,6 +98,8 @@ const CafePage = () => {
   const [orderFilter, setOrderFilter] = useState('all');
   const [reservedTable, setReservedTable] = useState(null);
   const [menuToken, setMenuToken] = useState(null);
+  const [openingTableMenu, setOpeningTableMenu] = useState(false);
+  const [tableMenuError, setTableMenuError] = useState('');
   const [updatingOrder, setUpdatingOrder] = useState(null);
   const [orderActionError, setOrderActionError] = useState('');
   const [now, setNow] = useState(0);
@@ -231,7 +233,7 @@ const CafePage = () => {
     return () => window.clearInterval(timer);
   }, [orders.preparing.length]);
 
-  const openTable = (tableId) => {
+  const openTable = async (tableId) => {
     setSelectedTableForAction(null);
     const table = tables.find((item) => item.tableId === tableId);
     if (table?.status === 'reserved') {
@@ -239,8 +241,21 @@ const CafePage = () => {
       setStationPopup('reservation');
       return;
     }
-    setMenuToken(table?.currentQrToken?.token || `demo-token-${tableId}`);
     setStationPopup('menu');
+    setMenuToken(null);
+    setTableMenuError('');
+    setOpeningTableMenu(true);
+    try {
+      const response = await tableApi.createVirtualToken(tableId);
+      if (!response?.success || !response.data?.token) {
+        throw new Error(response?.message || 'Could not open this table menu.');
+      }
+      setMenuToken(response.data.token);
+    } catch (error) {
+      setTableMenuError(error.response?.data?.message || error.message || 'Could not open this table menu.');
+    } finally {
+      setOpeningTableMenu(false);
+    }
   };
 
   const beginSceneShowcase = useCallback((place, tableId = null, point = null) => {
@@ -543,7 +558,7 @@ const CafePage = () => {
       {stationPopup && <div className="cafe-popover-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setStationPopup(null); }}>
         <section className={`cafe-station-popover ${stationPopup === 'menu' ? 'menu-popover' : 'service-popover'}`} role="dialog" aria-modal="true" aria-labelledby="station-popup-title">
           <header><span className="station-icon kitchen">{stationPopup === 'kitchen' ? <ChefHat size={17} /> : stationPopup === 'menu' ? <Coffee size={17} /> : stationPopup === 'reservation' ? <CalendarDays size={17} /> : <ShoppingBag size={17} />}</span><div><h2 id="station-popup-title">{stationPopup === 'menu' ? 'Order at your table' : stationPopup === 'reservation' ? 'Reserved table' : 'Counter · ticket desk'}</h2></div><button type="button" aria-label="Close café window" onClick={() => setStationPopup(null)}><X size={18} /></button></header>
-          {stationPopup === 'menu' ? <iframe className="cafe-menu-frame" title="Little Window Café table menu" src={`/table/${menuToken}`} /> : stationPopup === 'reservation' ? <div className="reservation-notice"><span><CalendarDays size={19} /></span><h3>{reservedTable?.displayName || reservedTable?.tableId}</h3><p>This table is reserved for a future visit. Choose another table to order.</p>{reservedTable?.reservation?.startsAt && <small>{new Date(reservedTable.reservation.startsAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</small>}<button type="button" onClick={() => setStationPopup(null)}>Choose another table</button></div> : <div className="order-panel-content">
+          {stationPopup === 'menu' ? openingTableMenu ? <div className="reservation-notice" role="status">Opening your table menu…</div> : tableMenuError ? <div className="reservation-notice" role="alert"><p>{tableMenuError}</p><button type="button" onClick={() => setStationPopup(null)}>Close</button></div> : menuToken ? <iframe className="cafe-menu-frame" title="Little Window Café table menu" src={`/table/${encodeURIComponent(menuToken)}`} /> : null : stationPopup === 'reservation' ? <div className="reservation-notice"><span><CalendarDays size={19} /></span><h3>{reservedTable?.displayName || reservedTable?.tableId}</h3><p>This table is reserved for a future visit. Choose another table to order.</p>{reservedTable?.reservation?.startsAt && <small>{new Date(reservedTable.reservation.startsAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</small>}<button type="button" onClick={() => setStationPopup(null)}>Choose another table</button></div> : <div className="order-panel-content">
             <div className="order-filter-bar" role="tablist" aria-label="Filter orders by status">
               {[['all', 'All'], ['new', 'At counter'], ['confirmed', 'In kitchen'], ['preparing', 'Cooking'], ['ready', 'Ready']].map(([filter, label]) => <button type="button" role="tab" aria-selected={orderFilter === filter} className={orderFilter === filter ? 'is-active' : ''} onClick={() => setOrderFilter(filter)} key={filter}>{label}<span>{orderCounts[filter]}</span></button>)}
             </div>

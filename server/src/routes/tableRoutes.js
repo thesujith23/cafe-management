@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import {
-  getTables, getTablesManage, getTable, validateTableToken,
+  getTables, getTablesManage, getTable, validateTableToken, createVirtualTableToken,
   generateQR, downloadQR, updateTableStatus,
   checkinTable, clearTable, createTableReservation,
 } from '../controllers/tableController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { tableStatusSchema, reservationSchema, checkinSchema } from '../validators/schemas.js';
+import { virtualTableLimiter } from '../middleware/limiters.js';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ const FLOOR = ['owner', 'counter'];
 router.get('/validate/:token', validateTableToken);
 router.get('/token/:token', validateTableToken);
 router.post('/checkin/:token', validateBody(checkinSchema), checkinTable);
+router.post('/:tableId/virtual-token', virtualTableLimiter, createVirtualTableToken);
 router.post('/:id/reservations', validateBody(reservationSchema), createTableReservation);
 
 // Public floor map: identity, capacity, status and free/busy only — never QR tokens or

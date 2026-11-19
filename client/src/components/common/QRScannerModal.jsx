@@ -1,111 +1,184 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
+import { tableApi } from '../../api/apiServices';
 import {
   X,
   Camera,
   Upload,
   QrCode,
   AlertCircle,
-  Sparkles,
   Utensils,
   CheckCircle2,
 } from 'lucide-react';
 
-const TABLES = [
-  { id: 1, name: 'Table 1', token: 'demo-token-TBL-001', capacity: 4 },
-  { id: 2, name: 'Table 2', token: 'demo-token-TBL-002', capacity: 4 },
-  { id: 3, name: 'Table 3', token: 'demo-token-TBL-003', capacity: 6 },
-  { id: 4, name: 'Table 4', token: 'demo-token-TBL-004', capacity: 2 },
-  { id: 5, name: 'Table 5', token: 'demo-token-TBL-005', capacity: 8 },
-  { id: 6, name: 'Table 6', token: 'demo-token-TBL-006', capacity: 4 },
-];
+const extractToken = (decodedText) => {
+  const value = String(decodedText || '').trim();
+  if (!value) return null;
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      const match = url.pathname.match(/^\/(?:table|order|menu)\/([^/]+)\/?$/);
+      return match ? decodeURIComponent(match[1]) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const pathMatch = value.match(/^\/(?:table|order|menu)\/([^/?#]+)/);
+  return pathMatch ? decodeURIComponent(pathMatch[1]) : value;
+};
 
 const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
   const navigate = useNavigate();
   const [activeMode, setActiveMode] = useState('camera'); // 'camera' | 'upload' | 'simulate'
-  const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [scannedResult, setScannedResult] = useState('');
+  const [tables, setTables] = useState([]);
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [selectingTable, setSelectingTable] = useState('');
   const html5QrCodeRef = useRef(null);
   const fileInputRef = useRef(null);
+  const processingRef = useRef(false);
+  const cameraActiveRef = useRef(false);
+  const scannerGenerationRef = useRef(0);
 
-  // Parse token from scanned text (URL or raw token)
-  const handleDecodedText = (decodedText) => {
-    let token = decodedText.trim();
-    if (token.includes('/table/')) {
-      token = token.split('/table/')[1]?.split('?')[0];
-    } else if (token.includes('/order/')) {
-      token = token.split('/order/')[1]?.split('?')[0];
-    } else if (token.includes('/menu/')) {
-      token = token.split('/menu/')[1]?.split('?')[0];
+  const stopScanner = useCallback(async () => {
+    scannerGenerationRef.current += 1;
+    if (html5QrCodeRef.current && cameraActiveRef.current) {
+      try {
+        await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current.clear();
+      } catch (error) {
+        console.warn('Error stopping scanner:', error);
+      } finally {
+        cameraActiveRef.current = false;
+      }
+    }
+  }, []);
+
+  const closeModal = useCallback(() => {
+    stopScanner();
+    processingRef.current = false;
+    setCameraError('');
+    setScannedResult('');
+    setSelectingTable('');
+    setActiveMode('camera');
+    onClose();
+  }, [onClose, stopScanner]);
+
+  const continueToTable = useCallback((token, tableName) => {
+    setScannedResult(tableName || 'Your table');
+    stopScanner();
+    setTimeout(() => {
+      closeModal();
+      if (onSelectToken) onSelectToken(token);
+      else navigate(`/table/${encodeURIComponent(token)}`);
+    }, 500);
+  }, [closeModal, navigate, onSelectToken, stopScanner]);
+
+  const handleDecodedText = useCallback(async (decodedText) => {
+    if (processingRef.current) return;
+    const token = extractToken(decodedText);
+    if (!token) {
+      setCameraError('This QR code is not a Little Window Café table link.');
+      return;
     }
 
-    if (token) {
-      setScannedResult(token);
-      stopScanner();
-      setTimeout(() => {
-        onClose();
-        if (onSelectToken) onSelectToken(token);
-        else navigate(`/table/${token}`);
-      }, 700);
+    processingRef.current = true;
+    setCameraError('');
+    try {
+      const response = await tableApi.validateToken(token);
+      if (!response?.success || !response.data?.table) {
+        throw new Error(response?.message || 'This QR code is invalid or has expired.');
+      }
+      continueToTable(token, response.data.table.displayName);
+    } catch (error) {
+      processingRef.current = false;
+      setCameraError(error.response?.data?.message || error.message || 'This QR code could not be verified.');
     }
-  };
+  }, [continueToTable]);
 
-  const startScanner = async () => {
+  const handleVirtualTableSelect = useCallback(async (table) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setSelectingTable(table.tableId);
+    setCameraError('');
+    try {
+      const response = await tableApi.createVirtualToken(table.tableId);
+      if (!response?.success || !response.data?.token) {
+        throw new Error(response?.message || 'Could not open this table.');
+      }
+      continueToTable(response.data.token, table.displayName || table.tableId);
+    } catch (error) {
+      processingRef.current = false;
+      setCameraError(error.response?.data?.message || error.message || 'Could not open this table.');
+    } finally {
+      setSelectingTable('');
+    }
+  }, [continueToTable]);
+
+  const startScanner = useCallback(async () => {
     setCameraError('');
     try {
       if (!html5QrCodeRef.current) {
         html5QrCodeRef.current = new Html5Qrcode('qr-reader-region');
       }
+      if (cameraActiveRef.current) return;
+      const generation = scannerGenerationRef.current + 1;
+      scannerGenerationRef.current = generation;
 
       await html5QrCodeRef.current.start(
         { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText) => {
-          handleDecodedText(decodedText);
-        },
-        () => {
-          // Frame error (no QR detected in frame), normal ignored
-        }
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => handleDecodedText(decodedText),
+        () => {},
       );
-      setCameraActive(true);
+      if (scannerGenerationRef.current !== generation) {
+        await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current.clear();
+        return;
+      }
+      cameraActiveRef.current = true;
     } catch (err) {
       console.warn('Camera start error:', err);
       setCameraError(
         'Camera permission was denied or camera is not available. You can upload a QR image or select your table below.'
       );
-      setCameraActive(false);
     }
-  };
-
-  const stopScanner = async () => {
-    if (html5QrCodeRef.current && cameraActive) {
-      try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current.clear();
-      } catch (e) {
-        console.warn('Error stopping scanner:', e);
-      }
-      setCameraActive(false);
-    }
-  };
+  }, [handleDecodedText]);
 
   useEffect(() => {
     if (isOpen && activeMode === 'camera') {
       const timer = setTimeout(() => {
-        startScanner();
+        void startScanner();
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        void stopScanner();
+      };
     } else {
-      stopScanner();
+      void stopScanner();
     }
+    return undefined;
+  }, [isOpen, activeMode, startScanner, stopScanner]);
 
+  useEffect(() => {
+    if (!isOpen || activeMode !== 'simulate') return undefined;
+    let active = true;
+    tableApi.getTables()
+      .then((response) => {
+        if (active) setTables(Array.isArray(response?.data) ? response.data : []);
+      })
+      .catch((error) => {
+        if (active) setCameraError(error.response?.data?.message || 'Could not load café tables.');
+      })
+      .finally(() => {
+        if (active) setLoadingTables(false);
+      });
     return () => {
-      stopScanner();
+      active = false;
     };
   }, [isOpen, activeMode]);
 
@@ -118,7 +191,7 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
       const html5QrCode = new Html5Qrcode('qr-reader-file');
       const decodedText = await html5QrCode.scanFile(file, true);
       handleDecodedText(decodedText);
-    } catch (err) {
+    } catch {
       setCameraError('Could not find a valid QR code in this image. Please try another image.');
     }
   };
@@ -141,10 +214,7 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
           </div>
 
           <button
-            onClick={() => {
-              stopScanner();
-              onClose();
-            }}
+            onClick={closeModal}
             className="p-2 rounded-xl text-thistle-400 hover:text-white hover:bg-space_indigo-300 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -168,6 +238,7 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
           <button
             onClick={() => {
               stopScanner();
+              setCameraError('');
               setActiveMode('upload');
             }}
             className={`flex-1 py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
@@ -182,7 +253,10 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
 
           <button
             onClick={() => {
+              if (activeMode === 'simulate') return;
               stopScanner();
+              setCameraError('');
+              setLoadingTables(true);
               setActiveMode('simulate');
             }}
             className={`flex-1 py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
@@ -192,7 +266,7 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
             }`}
           >
             <Utensils className="w-4 h-4" />
-            <span>Select Table</span>
+            <span>Choose Table</span>
           </button>
         </div>
 
@@ -203,8 +277,8 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
               <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h4 className="text-lg font-bold font-tenez text-white">QR Code Verified!</h4>
-              <p className="text-xs text-thistle-500 font-mono">Redirecting to dining table...</p>
+              <h4 className="text-lg font-bold font-tenez text-white">Table Ready!</h4>
+              <p className="text-xs text-thistle-500 font-mono">Opening {scannedResult}…</p>
             </div>
           ) : activeMode === 'camera' ? (
             <div className="w-full flex flex-col items-center">
@@ -255,32 +329,41 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
           ) : (
             <div className="w-full space-y-3 font-futura">
               <div className="text-center mb-4">
-                <h4 className="font-bold text-base font-tenez text-white">Select a Table to Simulate QR Scan</h4>
-                <p className="text-xs text-thistle-600 font-aleo">Instantly opens the table menu with signed token</p>
+                <h4 className="font-bold text-base font-tenez text-white">Choose a Table to Order From</h4>
+                <p className="text-xs text-thistle-600 font-aleo">Starts a temporary, table-specific ordering session. For an in-person visit, scan the QR on your table.</p>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {TABLES.map((table) => (
-                  <button
-                    key={table.id}
-                    onClick={() => {
-                      onClose();
-                      navigate(`/table/${table.token}`);
-                    }}
-                    className="p-3.5 rounded-2xl bg-space_indigo-300/60 hover:bg-space_indigo border border-space_indigo-400 hover:border-dusty_mauve text-center transition-all group shadow-2xs cursor-pointer"
-                  >
-                    <div className="font-extrabold text-white group-hover:scale-105 transition-transform text-sm font-futura">
-                      {table.name}
-                    </div>
-                    <div className="text-[11px] text-thistle-500 group-hover:text-thistle-900 font-aleo mt-0.5">
-                      {table.capacity} Guests
-                    </div>
-                    <span className="inline-block mt-2 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-space_indigo-100/80 text-dusty_mauve-600 group-hover:bg-white/20 group-hover:text-white font-aleo">
-                      Scan Table →
-                    </span>
-                  </button>
-                ))}
-              </div>
+                {loadingTables ? <p role="status" className="text-center text-xs text-thistle-500">Loading available tables…</p> : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {tables.filter((table) => table.status === 'available').map((table) => (
+                      <button
+                      key={table._id || table.tableId}
+                      disabled={Boolean(selectingTable)}
+                      onClick={() => handleVirtualTableSelect(table)}
+                        className="p-3.5 rounded-2xl bg-space_indigo-300/60 hover:bg-space_indigo border border-space_indigo-400 hover:border-dusty_mauve text-center transition-all group shadow-2xs cursor-pointer"
+                      >
+                        <div className="font-extrabold text-white group-hover:scale-105 transition-transform text-sm font-futura">
+                        {selectingTable === table.tableId ? 'Opening…' : table.displayName || table.tableId}
+                        </div>
+                        <div className="text-[11px] text-thistle-500 group-hover:text-thistle-900 font-aleo mt-0.5">
+                        {table.capacity} Guests
+                        </div>
+                        <span className="inline-block mt-2 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-space_indigo-100/80 text-dusty_mauve-600 group-hover:bg-white/20 group-hover:text-white font-aleo">
+                          Open Menu →
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+              )}
+              {cameraError && (
+                <div className="mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2 font-aleo" role="alert">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span>{cameraError}</span>
+                </div>
+              )}
+              {!loadingTables && !cameraError && !tables.some((table) => table.status === 'available') && (
+                <p className="text-center text-xs text-thistle-500">No tables are available right now.</p>
+              )}
             </div>
           )}
         </div>
@@ -289,10 +372,7 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
         <div className="p-4 bg-space_indigo-100/90 border-t border-space_indigo-400/50 flex items-center justify-between text-xs text-thistle-600 font-aleo">
           <span>Smart Café • Digital Table Dining</span>
           <button
-            onClick={() => {
-              stopScanner();
-              onClose();
-            }}
+            onClick={closeModal}
             className="text-thistle-400 hover:text-white font-semibold cursor-pointer"
           >
             Cancel

@@ -90,6 +90,37 @@ export const getTables = async (req, res, next) => {
   }
 };
 
+// @desc    Create a short-lived, table-scoped token for the public 3D café
+// @route   POST /api/tables/:tableId/virtual-token
+export const createVirtualTableToken = async (req, res, next) => {
+  const tableId = String(req.params.tableId || '').trim().toUpperCase();
+  if (!/^TBL-\d{3}$/.test(tableId)) {
+    return res.status(400).json({ success: false, message: 'Choose a valid café table.' });
+  }
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ success: false, message: 'Table ordering is temporarily unavailable.' });
+  }
+
+  try {
+    const table = await DiningTable.findOne({ tableId, isActive: true });
+    if (!table) return res.status(404).json({ success: false, message: 'Table not found.' });
+    if (table.status !== 'available') {
+      return res.status(409).json({ success: false, message: 'This table is not available. Choose another table.' });
+    }
+
+    const token = QRToken.generateToken();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+    await QRToken.create({ table: table._id, token, expiresAt });
+
+    return res.status(201).json({
+      success: true,
+      data: { token, expiresAt, table: publicTable(table) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 // @desc    Full table documents for the staff console (includes QR tokens and contacts)
 // @route   GET /api/tables/manage
 export const getTablesManage = async (req, res, next) => {
