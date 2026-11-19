@@ -80,6 +80,7 @@ export const CartProvider = ({ children }) => {
         const updated = [...prev];
         const newQty = updated[existingIdx].quantity + quantity;
         updated[existingIdx].quantity = newQty;
+        updated[existingIdx].discountPercent = menuItem.discountPercent || 0;
         updated[existingIdx].itemTotal = Math.round(itemUnitPrice * newQty * discountMultiplier * 100) / 100;
         return updated;
       }
@@ -92,6 +93,7 @@ export const CartProvider = ({ children }) => {
           name: menuItem.name,
           unitPrice,
           quantity,
+          discountPercent: menuItem.discountPercent || 0,
           selectedSizeId: selectedSize?._id,
           selectedSize: selectedSize ? { name: selectedSize.name, price: selectedSize.price } : null,
           selectedAddonIds: selectedAddons.map(a => a._id).filter(Boolean),
@@ -116,7 +118,8 @@ export const CartProvider = ({ children }) => {
         if (item.cartKey === cartKey) {
           const addonsTotal = (item.selectedAddons || []).reduce((sum, a) => sum + (a.price || 0), 0);
           const itemUnitPrice = item.unitPrice + addonsTotal;
-          const discountedTotal = Math.round(itemUnitPrice * newQty * 100) / 100;
+          const discountMultiplier = (100 - (item.discountPercent || 0)) / 100;
+          const discountedTotal = Math.round(itemUnitPrice * newQty * discountMultiplier * 100) / 100;
           return {
             ...item,
             quantity: newQty,

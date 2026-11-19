@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MessageCircle, X, Loader2, Send } from 'lucide-react';
 const ChatBubbleIcon = MessageCircle;
 import { chatBotApi } from '../../api/apiServices';
+import { useCart } from '../../context/CartContext';
 
 const EMPTY = {
   role: 'assistant',
@@ -43,6 +45,10 @@ const getPlaceholderFallback = (res) => {
 };
 
 const ChatBubble = () => {
+  const { pathname } = useLocation();
+  const { itemCount } = useCart();
+  const hasCartDock = itemCount > 0
+    && (pathname.startsWith('/table/') || pathname.startsWith('/order/'));
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([EMPTY]);
   const [draft, setDraft] = useState('');
@@ -123,7 +129,7 @@ const ChatBubble = () => {
     <>
       <button
         type="button"
-        className={`chat-launcher ${sending ? 'chat-launcher-busy' : ''}`}
+        className={`chat-launcher ${sending ? 'chat-launcher-busy' : ''} ${hasCartDock ? 'chat-launcher-cart-active' : ''}`}
         onClick={() => setOpen((value) => !value)}
         aria-label={open ? 'Close chat' : 'Open chat'}
         aria-expanded={open}
@@ -135,7 +141,7 @@ const ChatBubble = () => {
       </button>
 
       {open && (
-        <div className="chat-window" role="dialog" aria-label="Little Window Café chat">
+        <div className={`chat-window ${hasCartDock ? 'chat-window-cart-active' : ''}`} role="dialog" aria-label="Little Window Café chat">
           <div className="chat-header">
             <span className="chat-header-avatar" aria-hidden="true">☕</span>
             <span className="chat-header-titles">

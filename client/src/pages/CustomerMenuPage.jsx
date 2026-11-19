@@ -29,7 +29,9 @@ const CustomerMenuPage = () => {
     setTableInfo,
     customerInfo,
     setCustomerInfo,
+    items,
     addItem,
+    updateQuantity,
     itemCount,
     totalAmount,
   } = useCart();
@@ -262,7 +264,26 @@ const CustomerMenuPage = () => {
             <div className="order-empty-state"><Coffee size={22} /><strong>No dishes found</strong><span>Try another search or menu category.</span></div>
           ) : (
             <div className="order-food-grid">
-              {filteredItems.map((item) => <MenuCard key={item._id} item={item} onSelect={setSelectedItemForModal} onQuickAdd={handleQuickAdd} />)}
+              {filteredItems.map((item) => {
+                const baseCartItem = items.find((cartItem) => (
+                  cartItem.menuItemId === item._id
+                  && !cartItem.selectedSize
+                  && !cartItem.selectedAddons?.length
+                  && !cartItem.specialInstructions
+                ));
+                return (
+                  <MenuCard
+                    key={item._id}
+                    item={item}
+                    quantity={baseCartItem?.quantity || 0}
+                    onDecrease={() => {
+                      if (baseCartItem) updateQuantity(baseCartItem.cartKey, baseCartItem.quantity - 1);
+                    }}
+                    onSelect={setSelectedItemForModal}
+                    onQuickAdd={handleQuickAdd}
+                  />
+                );
+              })}
             </div>
           )}
         </section>

@@ -461,6 +461,14 @@
   }
 }
 
+@media (max-width: 560px) {
+  .chat-launcher-cart-active { bottom: 78px; }
+  .chat-window-cart-active {
+    bottom: 140px;
+    height: min(60vh, calc(100dvh - 168px));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chat-window { animation: none; }
   .chat-launcher,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Clock3, Plus, SlidersHorizontal } from 'lucide-react';
+import { Clock3, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { formatINR } from '../../utils/formatters';
 import { getMenuImage } from '../../utils/menuImages';
 
@@ -13,9 +13,8 @@ function getFoodPosition(item) {
   return '0% 0%';
 }
 
-const MenuCard = ({ item, onSelect, onQuickAdd }) => {
+const MenuCard = ({ item, quantity, onDecrease, onSelect, onQuickAdd }) => {
   const [photoFailed, setPhotoFailed] = useState(false);
-  const [justAdded, setJustAdded] = useState(false);
   const hasCustomizations = Boolean(item.sizes?.length || item.addons?.length);
   const isOutOfStock = !item.isAvailable;
   // Prefer an image the admin uploaded, otherwise use the photo that matches this dish's name.
@@ -29,8 +28,6 @@ const MenuCard = ({ item, onSelect, onQuickAdd }) => {
       return;
     }
     onQuickAdd(item);
-    setJustAdded(true);
-    window.setTimeout(() => setJustAdded(false), 1000);
   };
 
   return (
@@ -53,10 +50,22 @@ const MenuCard = ({ item, onSelect, onQuickAdd }) => {
         <p>{item.description || 'Freshly prepared in our café kitchen.'}</p>
         <div className="order-food-bottom">
           <strong>{formatINR(item.price)}</strong>
-          <button type="button" className={`order-add-button ${justAdded ? 'is-added' : ''}`} onClick={addItem} disabled={isOutOfStock} aria-label={justAdded ? `${item.name} added` : `${hasCustomizations ? 'Customize' : 'Add'} ${item.name}`}>
-            {justAdded ? <Check size={16} /> : hasCustomizations ? <SlidersHorizontal size={15} /> : <Plus size={17} />}
-            <span>{justAdded ? 'Added' : hasCustomizations ? 'Options' : 'Add'}</span>
-          </button>
+          {!hasCustomizations && quantity > 0 ? (
+            <div className="order-quantity-control" role="group" aria-label={`${item.name} quantity`}>
+              <button type="button" onClick={onDecrease} aria-label={`Remove one ${item.name}`}>
+                <Minus size={15} />
+              </button>
+              <span aria-live="polite">{quantity}</span>
+              <button type="button" onClick={() => onQuickAdd(item)} disabled={isOutOfStock} aria-label={`Add one more ${item.name}`}>
+                <Plus size={15} />
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="order-add-button" onClick={addItem} disabled={isOutOfStock} aria-label={`${hasCustomizations ? 'Customize' : 'Add'} ${item.name}`}>
+              {hasCustomizations ? <SlidersHorizontal size={15} /> : <Plus size={17} />}
+              <span>{hasCustomizations ? 'Options' : 'Add'}</span>
+            </button>
+          )}
         </div>
       </div>
     </article>
