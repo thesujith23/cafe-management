@@ -1,8 +1,16 @@
 import { useEffect, useRef } from 'react';
+import { createMaterialLibrary, roundedBoxGeometry } from './sceneMaterials';
+import { addContactShadow, addLightShaft, buildEnvironmentMap } from './sceneEnvironment';
+import { neonTexture, setupNightDecor } from './sceneNightDecor';
+import { setupSurroundings } from './sceneSurroundings';
+import { setupMist } from './sceneMist';
 
+// Two rows of three, pulled apart into the floor the room actually has. The rows keep
+// three tables each so the guest walk paths, the 1-6 shortcuts and the camera focus
+// all still line up with the table index.
 const TABLE_SPOTS = [
-  { x: -7, z: 0.8 }, { x: 0, z: 0.8 }, { x: 7, z: 0.8 },
-  { x: -7, z: 5.1 }, { x: 0, z: 5.1 }, { x: 7, z: 5.1 },
+  { x: -7.6, z: 1.2 }, { x: 0, z: 1.2 }, { x: 7.6, z: 1.2 },
+  { x: -7.6, z: 6.3 }, { x: 0, z: 6.3 }, { x: 7.6, z: 6.3 },
 ];
 const FALLBACK_TABLES = TABLE_SPOTS.map((_, index) => ({ tableId: `TBL-00${index + 1}`, displayName: `Table ${index + 1}`, status: 'available' }));
 const PALETTE = {
@@ -11,13 +19,169 @@ const PALETTE = {
   skin: '#c89170', ember: '#ff7a5c', leaf: '#4c6b52', blue: '#617176',
 };
 
+// One material library per mounted scene: a handful of shared shaders and procedural
+// maps instead of a brand-new material for every mesh the room builds.
+let MATERIAL_LIBRARY = null;
+
 function makeMaterial(THREE, color, extra = {}) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.82, ...extra });
+  const library = MATERIAL_LIBRARY;
+  if (!library) return new THREE.MeshStandardMaterial({ color, roughness: 0.82, ...extra });
+  if (extra.transmission !== undefined || extra.clearcoat !== undefined) return library.physical(color, extra);
+  return library.standard(color, extra);
 }
+
+const woodMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.wood(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const plasterMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.plaster(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const fabricMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.fabric(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const steelMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.steel(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const tileMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.tile(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const ceramicMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.ceramic(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const marbleMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.marble(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const velvetMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.velvet(color, extra)
+  : makeMaterial(THREE, color, extra));
+
+const brassMaterial = (THREE, color, extra = {}) => (MATERIAL_LIBRARY
+  ? MATERIAL_LIBRARY.brass(color, extra)
+  : makeMaterial(THREE, color, { metalness: 0.92, roughness: 0.3, ...extra }));
+
+// Broad daylight seen from inside: sky wash, a soft treeline and a row of rooftops.
+const windowViewTexture = (THREE) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 160;
+  const context = canvas.getContext('2d');
+  const sky = context.createLinearGradient(0, 0, 0, 160);
+  sky.addColorStop(0, '#cfe0e6');
+  sky.addColorStop(0.6, '#e4ece7');
+  sky.addColorStop(1, '#cdd8cc');
+  context.fillStyle = sky;
+  context.fillRect(0, 0, 128, 160);
+  context.fillStyle = 'rgba(146, 158, 152, .32)';
+  for (let index = 0; index < 7; index += 1) {
+    context.fillRect(index * 19, 116 - (index % 4) * 8, 11 + (index % 3) * 6, 44);
+  }
+  context.fillStyle = 'rgba(92, 116, 88, .45)';
+  context.beginPath();
+  context.arc(32, 112, 13, 0, Math.PI * 2);
+  context.arc(86, 106, 10, 0, Math.PI * 2);
+  context.fill();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+};
+
+// A tall arched window with a painted white frame, mullions and a deep sill. The glass
+// is unlit so the opening reads as daylight rather than another lit surface.
+function addArchWindow(THREE, parent, name, { x, z, width, height, base }) {
+  const group = new THREE.Group();
+  group.name = name;
+  group.position.set(x, 0, z);
+  group.rotation.y = Math.PI / 2;
+  parent.add(group);
+
+  const archPath = (w, h, path = new THREE.Shape()) => {
+    path.moveTo(w / 2, 0);
+    path.lineTo(w / 2, h - w / 2);
+    path.absarc(0, h - w / 2, w / 2, 0, Math.PI, false);
+    path.lineTo(-w / 2, 0);
+    path.lineTo(w / 2, 0);
+    return path;
+  };
+
+  const frameMaterial = makeMaterial(THREE, '#efece2', { roughness: 0.7 });
+  const frameShape = archPath(width, height);
+  frameShape.holes.push(archPath(width - 0.2, height - 0.2, new THREE.Path()));
+  const frame = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(frameShape, { depth: 0.12, bevelEnabled: false, curveSegments: 20 }),
+    frameMaterial,
+  );
+  frame.name = `${name}-frame`;
+  frame.position.set(0, base, -0.06);
+  frame.castShadow = false;
+  group.add(frame);
+
+  const glassMaterial = new THREE.MeshBasicMaterial({
+    map: windowViewTexture(THREE),
+    color: '#eaf2f0',
+    toneMapped: false,
+  });
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(width - 0.2, height - 0.2), glassMaterial);
+  glass.name = `${name}-glass`;
+  glass.position.set(0, base + (height - 0.2) / 2, -0.08);
+  group.add(glass);
+
+  box(THREE, group, `${name}-mullion`, [0.05, height - 0.2, 0.05], [0, base + (height - 0.2) / 2, -0.04], '#efece2', { material: frameMaterial, castShadow: false });
+  box(THREE, group, `${name}-transom`, [width - 0.2, 0.05, 0.05], [0, base + (height - 0.2) * 0.62, -0.04], '#efece2', { material: frameMaterial, castShadow: false });
+  box(THREE, group, `${name}-sill`, [width + 0.18, 0.1, 0.3], [0, base - 0.05, -0.03], '#efece2', { material: frameMaterial, castShadow: false });
+
+  return { group, glass, glassMaterial, frameMaterial };
+}
+
+// A floor plant: glazed pot, soil and a splay of big leaves. Three or four of these
+// are what stop a large room reading as furniture standing on an empty floor.
+function addPottedPlant(THREE, parent, name, x, z, scale = 1) {
+  const group = new THREE.Group();
+  group.name = name;
+  group.position.set(x, 0, z);
+  parent.add(group);
+  cylinder(THREE, group, `${name}-pot`, 0.36 * scale, 0.28 * scale, 0.52 * scale, [0, 0.26 * scale, 0], '#b0a496', 12, { material: ceramicMaterial(THREE, '#b0a496') });
+  cylinder(THREE, group, `${name}-soil`, 0.31 * scale, 0.31 * scale, 0.05, [0, 0.52 * scale, 0], '#3f3226', 10, { castShadow: false });
+  for (let index = 0; index < 7; index += 1) {
+    const angle = (index / 7) * Math.PI * 2 + 0.5;
+    const leaf = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28 * scale, 7, 5),
+      makeMaterial(THREE, index % 3 ? '#3f6b4a' : '#517e57', { roughness: 0.74 }),
+    );
+    leaf.name = `${name}-leaf`;
+    leaf.scale.set(0.5, 1.6, 0.3);
+    leaf.position.set(Math.cos(angle) * 0.3 * scale, (0.98 + (index % 3) * 0.24) * scale, Math.sin(angle) * 0.3 * scale);
+    leaf.rotation.set(Math.cos(angle) * 0.45, angle, -Math.sin(angle) * 0.45);
+    group.add(leaf);
+  }
+  return group;
+}
+
 
 function box(THREE, parent, name, size, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(size[0], size[1], size[2]),
+    options.material || makeMaterial(THREE, color, options.materialOptions),
+  );
+  mesh.name = name;
+  mesh.position.set(position[0], position[1], position[2]);
+  mesh.castShadow = options.castShadow !== false;
+  mesh.receiveShadow = options.receiveShadow !== false;
+  parent.add(mesh);
+  return mesh;
+}
+
+// Same contract as every other builder in this file, but with chamfered edges.
+function roundedBox(THREE, parent, name, size, position, color, options = {}) {
+  const geometry = roundedBoxGeometry(THREE, size[0], size[1], size[2], options.radius ?? 0.06, options.bevel ?? 0.016);
+  const mesh = new THREE.Mesh(
+    geometry,
     options.material || makeMaterial(THREE, color, options.materialOptions),
   );
   mesh.name = name;
@@ -203,10 +367,11 @@ function addHuman(THREE, scene, options = {}) {
   person.rotation.y = rotation;
   person.userData.role = role;
   scene.add(person);
+  addContactShadow(THREE, person, MATERIAL_LIBRARY?.textures, { radius: 0.5, y: 0.021, strength: 0.4 });
 
   const skinMat = makeMaterial(THREE, skin, { roughness: 0.72 });
   const hairMat = makeMaterial(THREE, hair, { roughness: 0.94 });
-  const shirtMat = makeMaterial(THREE, shirt, { roughness: 0.9 });
+  const shirtMat = fabricMaterial(THREE, shirt, { roughness: 0.9 });
   const pantsMat = makeMaterial(THREE, role === 'cook' ? '#3b4543' : '#39444b');
   const shoeMat = makeMaterial(THREE, '#47362d');
   const eyeMat = makeMaterial(THREE, '#2c302c', { roughness: 0.55 });
@@ -376,10 +541,10 @@ function setupDiningGuests(THREE, scene, tableMeshes) {
       const meal = new THREE.Group();
       meal.name = 'guest-table-setting';
       meal.position.set(plateX, 1.055, plateZ);
-      cylinder(THREE, meal, 'guest-ceramic-plate', 0.3, 0.3, 0.04, [0, 0, 0], '#ece5d6', 14, { castShadow: false });
+      cylinder(THREE, meal, 'guest-ceramic-plate', 0.3, 0.3, 0.04, [0, 0, 0], '#ece5d6', 14, { castShadow: false, material: ceramicMaterial(THREE, '#ece5d6') });
       cylinder(THREE, meal, 'guest-meal', 0.205, 0.22, 0.065, [0, 0.045, 0], ['#ad6943', '#9b8150', '#78815c', '#b5804c'][guestIndex % 4], 9, { castShadow: false });
       cylinder(THREE, meal, 'guest-garnish', 0.065, 0.065, 0.025, [0.08, 0.092, -0.04], '#7f8a61', 7, { castShadow: false });
-      cylinder(THREE, meal, 'guest-coffee-cup', 0.09, 0.11, 0.17, [plateX + (guest.dx < 0 ? -0.31 : 0.31), 0.095, plateZ + 0.08], '#e7dfd1', 10, { castShadow: false });
+      cylinder(THREE, meal, 'guest-coffee-cup', 0.09, 0.11, 0.17, [plateX + (guest.dx < 0 ? -0.31 : 0.31), 0.095, plateZ + 0.08], '#e7dfd1', 10, { castShadow: false, material: ceramicMaterial(THREE, '#e7dfd1') });
       cylinder(THREE, meal, 'guest-coffee', 0.076, 0.076, 0.014, [plateX + (guest.dx < 0 ? -0.31 : 0.31), 0.184, plateZ + 0.08], '#50392b', 10, { castShadow: false });
       const fork = box(THREE, meal, 'guest-fork', [0.025, 0.16, 0.018], [plateX - 0.29, 0.035, plateZ - 0.05], '#9b9a8c', { castShadow: false });
       fork.rotation.z = 0.18;
@@ -402,38 +567,88 @@ function createTable(THREE, scene, table, spot, index) {
   group.userData.tableId = table.tableId;
   scene.add(group);
 
-  const wood = makeMaterial(THREE, index % 2 ? '#76553a' : '#8b6948');
-  const top = cylinder(THREE, group, 'table-top', 1.02, 1.02, 0.2, [0, 0.93, 0], wood, 10);
+  // Marble slab on a brass pedestal: the round café table from the reference room.
+  // The material goes in the options, not the colour slot: passing a material as the
+  // colour is what used to leave every table top flat white.
+  const marble = marbleMaterial(THREE, '#f2eee4');
+  const top = cylinder(THREE, group, 'table-top', 1.02, 1.02, 0.12, [0, 0.97, 0], '#f2eee4', 14, { material: marble });
   top.userData.tableId = table.tableId;
-  top.userData.originalColor = wood.color.clone();
-  cylinder(THREE, group, 'table-under-rim', 0.78, 0.84, 0.13, [0, 0.78, 0], '#513a29', 10);
-  cylinder(THREE, group, 'table-pedestal', 0.2, 0.32, 0.72, [0, 0.39, 0], '#493728', 8);
-  cylinder(THREE, group, 'table-foot', 0.66, 0.66, 0.12, [0, 0.08, 0], '#624733', 8);
+  top.userData.originalColor = top.material.color.clone();
+  // A slim brass edge band: something for the light to catch instead of the
+  // paper-thin edge of a cylinder.
+  const topBand = new THREE.Mesh(
+    new THREE.TorusGeometry(1.018, 0.026, 6, 30),
+    brassMaterial(THREE, '#c09a5b'),
+  );
+  topBand.name = 'table-top-bevel';
+  topBand.rotation.x = Math.PI / 2;
+  topBand.position.y = 0.97;
+  topBand.castShadow = false;
+  group.add(topBand);
+  cylinder(THREE, group, 'table-apron', 0.5, 0.62, 0.08, [0, 0.9, 0], '#b08a52', 12, { material: brassMaterial(THREE, '#b08a52') });
+  cylinder(THREE, group, 'table-pedestal', 0.14, 0.26, 0.82, [0, 0.49, 0], '#b08a52', 12, { material: brassMaterial(THREE, '#b08a52') });
+  cylinder(THREE, group, 'table-foot', 0.34, 0.4, 0.06, [0, 0.09, 0], '#b08a52', 16, { material: brassMaterial(THREE, '#b08a52') });
 
-  for (const [dx, dz, rot] of [[-1.3, 0, Math.PI / 2], [1.3, 0, -Math.PI / 2], [0, -1.3, 0], [0, 1.3, Math.PI]]) {
+  // A small pendant over each table: the light that lands on the marble, not just on the
+  // shade. Six of them, no shadow maps, so the room still draws cheaply.
+  const tableLamp = new THREE.Group();
+  tableLamp.name = 'table-pendant';
+  cylinder(THREE, tableLamp, 'table-lamp-cord', 0.014, 0.014, 1.2, [0, 4.22, 0], '#2c2924', 6, { castShadow: false });
+  cylinder(THREE, tableLamp, 'table-lamp-shade', 0.1, 0.34, 0.26, [0, 3.66, 0], '#a9834a', 12, { material: brassMaterial(THREE, '#a9834a') });
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.115, 10, 8),
+    makeMaterial(THREE, '#ffe8bf', { emissive: '#f0bd7a', emissiveIntensity: 0.8, roughness: 0.4 }),
+  );
+  bulb.name = 'table-lamp-bulb';
+  bulb.position.set(0, 3.5, 0);
+  bulb.castShadow = false;
+  tableLamp.add(bulb);
+  const lamp = new THREE.PointLight('#ffd9a6', 5, 6.5, 2);
+  lamp.position.set(0, 3.62, 0);
+  lamp.castShadow = false;
+  tableLamp.add(lamp);
+  group.add(tableLamp);
+
+  const chairSpots = [[-1.3, 0, Math.PI / 2], [1.3, 0, -Math.PI / 2], [0, -1.3, 0], [0, 1.3, Math.PI]];
+  chairSpots.forEach(([dx, dz, rot], chairIndex) => {
     const chair = new THREE.Group();
     chair.position.set(dx, 0, dz);
     chair.rotation.y = rot;
     group.add(chair);
-    box(THREE, chair, 'chair-seat', [0.76, 0.18, 0.72], [0, 0.55, 0], '#644833');
-    box(THREE, chair, 'chair-back', [0.76, 0.82, 0.16], [0, 0.98, -0.29], '#74553a');
-    box(THREE, chair, 'chair-back-inset', [0.49, 0.39, 0.035], [0, 1.02, -0.2], '#886747', { castShadow: false });
-    for (const lx of [-0.3, 0.3]) for (const lz of [-0.29, 0.29]) {
-      box(THREE, chair, 'chair-leg', [0.1, 0.53, 0.1], [lx, 0.27, lz], '#4c3627');
+    // Green and rust velvet alternate around the table, as they do in the reference.
+    const rust = (index + chairIndex) % 2 === 1;
+    const upholstery = rust ? '#a8542f' : '#35604a';
+    const upholsteryBack = rust ? '#96482a' : '#2e5643';
+    roundedBox(THREE, chair, 'chair-seat', [0.78, 0.24, 0.74], [0, 0.51, 0], upholstery, { radius: 0.12, bevel: 0.024, material: velvetMaterial(THREE, upholstery) });
+    roundedBox(THREE, chair, 'chair-back', [0.78, 0.8, 0.18], [0, 0.94, -0.3], upholsteryBack, { radius: 0.1, bevel: 0.02, material: velvetMaterial(THREE, upholsteryBack) });
+    for (const lx of [-0.28, 0.28]) for (const lz of [-0.28, 0.28]) {
+      box(THREE, chair, 'chair-leg', [0.055, 0.5, 0.055], [lx, 0.25, lz], '#b08a52', { material: brassMaterial(THREE, '#b08a52') });
     }
-  }
+  });
+
+  // A rug under every table cluster: patterned floor is most of what makes the
+  // reference room feel furnished rather than empty.
+  const rug = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.3, 3.7),
+    MATERIAL_LIBRARY ? MATERIAL_LIBRARY.rug(index % 2 ? 'rugRust' : 'rugNavy') : makeMaterial(THREE, '#333f58'),
+  );
+  rug.name = 'table-rug';
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.y = 0.045;
+  rug.receiveShadow = true;
+  group.add(rug);
 
   if (table.status === 'occupied') {
-    cylinder(THREE, group, 'plate', 0.31, 0.31, 0.035, [-0.35, 1.06, 0.1], '#e7dfcf', 16, { castShadow: false });
+    cylinder(THREE, group, 'plate', 0.31, 0.31, 0.035, [-0.35, 1.06, 0.1], '#e7dfcf', 16, { castShadow: false, material: ceramicMaterial(THREE, '#e7dfcf') });
     cylinder(THREE, group, 'plate-food', 0.19, 0.21, 0.065, [-0.35, 1.1, 0.1], '#ae6843', 9, { castShadow: false });
     box(THREE, group, 'side-dish', [0.23, 0.08, 0.18], [-0.08, 1.1, 0.2], '#7b805e', { castShadow: false });
-    cylinder(THREE, group, 'cup', 0.13, 0.16, 0.23, [0.47, 1.12, -0.22], '#ddd3bf', 10);
+    cylinder(THREE, group, 'cup', 0.13, 0.16, 0.23, [0.47, 1.12, -0.22], '#ddd3bf', 10, { material: ceramicMaterial(THREE, '#ddd3bf') });
     cylinder(THREE, group, 'coffee', 0.105, 0.105, 0.025, [0.47, 1.24, -0.22], '#49352a', 10, { castShadow: false });
   }
   const showcaseDish = new THREE.Group();
   showcaseDish.name = 'table-showcase-dish';
   showcaseDish.position.set(-0.36, 1.04, 0.16);
-  cylinder(THREE, showcaseDish, 'showcase-plate', 0.34, 0.34, 0.045, [0, 0, 0], '#e9e1d1', 16, { castShadow: false });
+  cylinder(THREE, showcaseDish, 'showcase-plate', 0.34, 0.34, 0.045, [0, 0, 0], '#e9e1d1', 16, { castShadow: false, material: ceramicMaterial(THREE, '#e9e1d1') });
   cylinder(THREE, showcaseDish, 'showcase-food', 0.22, 0.24, 0.075, [0, 0.055, 0], '#ad6943', 10, { castShadow: false });
   cylinder(THREE, showcaseDish, 'showcase-garnish', 0.075, 0.075, 0.035, [0.08, 0.11, 0.015], '#78815e', 8, { castShadow: false });
   group.add(showcaseDish);
@@ -449,12 +664,312 @@ function createTable(THREE, scene, table, spot, index) {
   group.add(reservedMarker);
   reservedMarker.visible = table.status === 'reserved';
 
+  addContactShadow(THREE, group, MATERIAL_LIBRARY?.textures, { radius: 2.15, strength: 0.5 });
+
   let guest = null;
   if (table.status === 'occupied') {
     guest = addHuman(THREE, scene, { x: spot.x, z: spot.z + 1.43, shirt: index % 2 ? '#66747a' : '#77765f', sitting: true, rotation: Math.PI });
     guest.userData.tableId = table.tableId;
   }
-  return { group, top, table, spot, guest, reservedMarker, showcaseDish };
+  return { group, top, table, spot, guest, reservedMarker, showcaseDish, lamp, bulb };
+}
+
+// ---- Wall dressing -------------------------------------------------------
+// The paintings and stickers are painted onto canvases at runtime: no image assets to
+// load, and the wall can be retuned by editing a palette instead of redrawing art.
+
+function paintingTexture(THREE, variant = 0) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 420;
+  const context = canvas.getContext('2d');
+  const palettes = [
+    { sky: '#f4e7cd', glow: '#e6b778', land: '#8a5a3c', ink: '#3f4f43', sun: '#fff4da' },
+    { sky: '#e9e2d1', glow: '#c8875f', land: '#6f7f63', ink: '#2f3f3a', sun: '#fdf1d8' },
+    { sky: '#f1e3d2', glow: '#d9a46f', land: '#7c5a45', ink: '#4a5a52', sun: '#fff6e2' },
+  ];
+  const palette = palettes[variant % palettes.length];
+  const sky = context.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, palette.sky);
+  sky.addColorStop(0.62, palette.glow);
+  sky.addColorStop(1, palette.land);
+  context.fillStyle = sky;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = palette.sun;
+  context.beginPath();
+  context.arc(214 - variant * 26, 116 + variant * 18, 40, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = palette.ink;
+  context.beginPath();
+  context.moveTo(0, 306);
+  context.bezierCurveTo(72, 244, 128, 286, 186, 252);
+  context.bezierCurveTo(244, 220, 286, 268, 320, 238);
+  context.lineTo(320, 420);
+  context.lineTo(0, 420);
+  context.closePath();
+  context.fill();
+
+  context.globalAlpha = 0.26;
+  for (let stroke = 0; stroke < 14; stroke += 1) {
+    context.strokeStyle = stroke % 2 ? palette.sky : palette.ink;
+    context.lineWidth = 2 + (stroke % 3);
+    context.beginPath();
+    const y = 60 + stroke * 24;
+    context.moveTo(18 + (stroke % 4) * 12, y);
+    context.bezierCurveTo(120, y - 12, 220, y + 14, 306, y - 4);
+    context.stroke();
+  }
+  context.globalAlpha = 1;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  if (THREE.sRGBEncoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+  if (THREE.SRGBColorSpace !== undefined) texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+// Original little sticker characters in an anime style: chibi faces, a cat, boba and a
+// ramen bowl. Drawn here so the wall has personality without borrowing anyone's art.
+function stickerTexture(THREE, kind) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  const ink = '#3b2c26';
+  context.lineJoin = 'round';
+  context.lineWidth = 5;
+  context.strokeStyle = ink;
+
+  if (kind === 'cat') {
+    context.fillStyle = '#f6d9b0';
+    context.beginPath();
+    context.moveTo(34, 44); context.lineTo(30, 20); context.lineTo(52, 34);
+    context.moveTo(94, 44); context.lineTo(98, 20); context.lineTo(76, 34);
+    context.fill();
+    context.beginPath();
+    context.arc(64, 72, 34, 0, Math.PI * 2);
+    context.fill(); context.stroke();
+    context.fillStyle = ink;
+    context.beginPath(); context.arc(52, 68, 4, 0, Math.PI * 2); context.arc(76, 68, 4, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.moveTo(58, 82); context.quadraticCurveTo(64, 88, 70, 82); context.stroke();
+    context.fillStyle = '#e8a3a0';
+    context.beginPath(); context.arc(44, 80, 7, 0, Math.PI * 2); context.arc(84, 80, 7, 0, Math.PI * 2); context.fill();
+  } else if (kind === 'girl') {
+    context.fillStyle = '#f2d3ad';
+    context.beginPath(); context.arc(64, 70, 32, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = '#4a3a3a';
+    context.beginPath(); context.arc(64, 62, 35, Math.PI, Math.PI * 2); context.fill();
+    context.beginPath(); context.arc(38, 66, 7, 0, Math.PI * 2); context.arc(90, 66, 7, 0, Math.PI * 2); context.fill();
+    context.fillStyle = ink;
+    context.beginPath(); context.arc(54, 72, 4.5, 0, Math.PI * 2); context.arc(74, 72, 4.5, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#fff';
+    context.beginPath(); context.arc(55.5, 70.5, 1.6, 0, Math.PI * 2); context.arc(75.5, 70.5, 1.6, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#eda9a2';
+    context.beginPath(); context.arc(46, 82, 6, 0, Math.PI * 2); context.arc(82, 82, 6, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = ink;
+    context.beginPath(); context.moveTo(58, 88); context.quadraticCurveTo(64, 93, 70, 88); context.stroke();
+  } else if (kind === 'boba') {
+    context.fillStyle = '#f3e6cf';
+    context.beginPath(); context.moveTo(40, 40); context.lineTo(88, 40); context.lineTo(80, 112); context.lineTo(48, 112); context.closePath();
+    context.fill(); context.stroke();
+    context.fillStyle = '#c98a5c';
+    context.fillRect(36, 32, 56, 10);
+    context.strokeRect(36, 32, 56, 10);
+    context.strokeStyle = '#d06a5a'; context.lineWidth = 6;
+    context.beginPath(); context.moveTo(72, 34); context.lineTo(86, 8); context.stroke();
+    context.fillStyle = '#4a3630';
+    for (const [x, y] of [[56, 98], [68, 102], [62, 90], [74, 92]]) {
+      context.beginPath(); context.arc(x, y, 5, 0, Math.PI * 2); context.fill();
+    }
+  } else if (kind === 'ramen') {
+    context.fillStyle = '#f6efe1';
+    context.beginPath(); context.arc(64, 70, 38, 0, Math.PI); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = '#e0c07a'; context.lineWidth = 4;
+    context.beginPath();
+    context.moveTo(42, 60); context.bezierCurveTo(56, 48, 66, 72, 80, 58);
+    context.moveTo(48, 54); context.bezierCurveTo(60, 44, 70, 66, 84, 54);
+    context.stroke();
+    context.fillStyle = '#f2a95f';
+    context.beginPath(); context.arc(70, 56, 9, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#c0c9b4'; context.lineWidth = 3;
+    context.beginPath(); context.moveTo(44, 46); context.bezierCurveTo(50, 36, 44, 30, 50, 22); context.stroke();
+    context.beginPath(); context.moveTo(62, 44); context.bezierCurveTo(68, 34, 62, 28, 68, 20); context.stroke();
+  } else {
+    context.fillStyle = '#f6cf7d';
+    context.beginPath();
+    for (let point = 0; point < 10; point += 1) {
+      const radius = point % 2 ? 18 : 40;
+      const angle = (Math.PI / 5) * point - Math.PI / 2;
+      const x = 64 + Math.cos(angle) * radius;
+      const y = 64 + Math.sin(angle) * radius;
+      if (point === 0) context.moveTo(x, y); else context.lineTo(x, y);
+    }
+    context.closePath(); context.fill(); context.stroke();
+    context.fillStyle = ink;
+    context.beginPath(); context.arc(56, 62, 3.4, 0, Math.PI * 2); context.arc(72, 62, 3.4, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.arc(64, 72, 6, 0.15, Math.PI - 0.15); context.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  if (THREE.sRGBEncoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+  if (THREE.SRGBColorSpace !== undefined) texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+// A framed painting hung flat on a wall: 'z' faces the room from the back wall,
+// 'x' faces it from the left wall.
+const hangFrame = (THREE, scene, { name, axis, at, width, height, variant }) => {
+  const texture = paintingTexture(THREE, variant);
+  const depth = 0.075;
+  const art = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.74, metalness: 0.04 }),
+  );
+  art.name = `${name}-art`;
+  if (axis === 'z') {
+    box(THREE, scene, `${name}-frame`, [width + 0.16, height + 0.16, depth], [at.x, at.y, at.z], '#322a24', { material: makeMaterial(THREE, '#322a24', { roughness: 0.62 }) });
+    art.position.set(at.x, at.y, at.z + depth / 2 + 0.004);
+  } else {
+    box(THREE, scene, `${name}-frame`, [depth, height + 0.16, width + 0.16], [at.x, at.y, at.z], '#322a24', { material: makeMaterial(THREE, '#322a24', { roughness: 0.62 }) });
+    art.rotation.y = Math.PI / 2;
+    art.position.set(at.x + depth / 2 + 0.004, at.y, at.z);
+  }
+  scene.add(art);
+};
+
+const hangSticker = (THREE, scene, { kind, axis, x, y, z, size }) => {
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: stickerTexture(THREE, kind), transparent: true, alphaTest: 0.08, toneMapped: false }),
+  );
+  mesh.name = `wall-sticker-${kind}`;
+  if (axis === 'x') mesh.rotation.y = Math.PI / 2;
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+};
+
+function setupWallDecor(THREE, scene) {
+  // Back wall: one large painting in the clear span between the menu board and the
+  // order screen, with a console under it and a wash light above.
+  hangFrame(THREE, scene, { name: 'back-wall-painting', axis: 'z', at: { x: 3.4, y: 3.2, z: -8.6 }, width: 1.42, height: 1.8, variant: 0 });
+  roundedBox(THREE, scene, 'wall-console', [1.9, 0.72, 0.42], [3.4, 0.5, -8.28], '#4a3526', { radius: 0.05, bevel: 0.014, material: woodMaterial(THREE, '#4a3526') });
+  for (const x of [2.7, 4.1]) box(THREE, scene, 'wall-console-leg', [0.08, 0.42, 0.08], [x, 0.21, -8.3], '#3a2a1e');
+  cylinder(THREE, scene, 'console-vase', 0.09, 0.11, 0.26, [3.05, 0.99, -8.28], '#bfae8e', 10, { material: ceramicMaterial(THREE, '#bfae8e') });
+  cylinder(THREE, scene, 'console-vase', 0.07, 0.09, 0.2, [3.8, 0.96, -8.28], '#8d9c82', 10, { material: ceramicMaterial(THREE, '#8d9c82') });
+
+  // Left wall, between the entry and the first window.
+  hangFrame(THREE, scene, { name: 'entry-wall-painting', axis: 'x', at: { x: -10.66, y: 3.15, z: -1.2 }, width: 1.2, height: 1.5, variant: 1 });
+  hangFrame(THREE, scene, { name: 'window-wall-painting', axis: 'x', at: { x: -10.66, y: 3.15, z: 0.9 }, width: 1.2, height: 1.5, variant: 2 });
+
+  // A wood slat panel fills the bare strip right of the order screen.
+  const slatMaterial = woodMaterial(THREE, '#4b3524');
+  box(THREE, scene, 'wall-slat-backing', [1.34, 2.5, 0.07], [9.65, 3.0, -8.58], '#31241a', { material: makeMaterial(THREE, '#31241a', { roughness: 0.86 }), castShadow: false });
+  for (let slat = -0.56; slat <= 0.57; slat += 0.185) {
+    box(THREE, scene, 'wall-slat', [0.08, 2.36, 0.055], [9.65 + slat, 3.0, -8.53], '#5a4029', { material: slatMaterial, castShadow: false });
+  }
+
+  // Slim brass picture lights over each frame.
+  box(THREE, scene, 'picture-light-bar', [0.66, 0.05, 0.05], [3.4, 4.2, -8.48], '#d8b06a', { material: brassMaterial(THREE, '#d8b06a'), castShadow: false });
+  for (const z of [-1.2, 0.9]) box(THREE, scene, 'picture-light-bar', [0.05, 0.05, 0.66], [-10.6, 4.0, z], '#d8b06a', { material: brassMaterial(THREE, '#d8b06a'), castShadow: false });
+
+  // Sticker clusters: a row above the brand sign and a pair by the lounge windows.
+  [['cat', 6.5], ['girl', 7.25], ['boba', 8.0], ['star', 8.72]].forEach(([kind, x]) => {
+    hangSticker(THREE, scene, { kind, axis: 'z', x, y: 6.6, z: -8.5, size: 0.52 });
+  });
+  [['ramen', 10.45], ['star', 11.05]].forEach(([kind, z]) => {
+    hangSticker(THREE, scene, { kind, axis: 'x', x: -10.62, y: 3.5, z, size: 0.46 });
+  });
+  hangSticker(THREE, scene, { kind: 'cat', axis: 'x', x: -10.62, y: 4.35, z: 10.75, size: 0.4 });
+
+  // A small A-frame chalkboard by the windows, the piece that makes the room look lived in.
+  const chalkboard = new THREE.Group();
+  chalkboard.name = 'chalkboard-sign';
+  chalkboard.position.set(-9.3, 0, 3.1);
+  chalkboard.rotation.y = 0.6;
+  scene.add(chalkboard);
+  box(THREE, chalkboard, 'chalkboard-panel', [0.92, 1.05, 0.06], [0, 1.14, 0], '#2f4038', { material: makeMaterial(THREE, '#2f4038', { roughness: 0.9 }) });
+  addLabel(THREE, chalkboard, 'FRESH BAKES', 0.76, 0.24, [0, 1.3, 0.04], { background: '#2f4038', color: '#e7dfcb', border: '#8b7c62' });
+  addLabel(THREE, chalkboard, 'COFFEE DAILY', 0.76, 0.24, [0, 1.0, 0.04], { background: '#2f4038', color: '#cfd8bf', border: '#8b7c62' });
+  for (const side of [-1, 1]) {
+    box(THREE, chalkboard, 'chalkboard-leg', [0.07, 1.55, 0.07], [side * 0.38, 0.77, 0.12], '#7d5a3a', { material: woodMaterial(THREE, '#7d5a3a') });
+  }
+
+  // The wash lights that keep the art readable after the room goes dark.
+  const wallSpots = [];
+  const wash = (name, position, target, angle) => {
+    const spot = new THREE.SpotLight('#ffcf96', 2.4, 14, angle, 0.75, 1.6);
+    spot.name = name;
+    spot.position.set(...position);
+    spot.target.position.set(...target);
+    spot.castShadow = false;
+    scene.add(spot);
+    scene.add(spot.target);
+    wallSpots.push(spot);
+  };
+  wash('gallery-wash', [3.4, 6.4, -6.2], [3.4, 3.1, -8.6], 0.62);
+  wash('slat-wash', [9.6, 6.2, -6.0], [9.6, 3.0, -8.6], 0.55);
+  wash('entry-wash', [-8.9, 6.2, -0.4], [-10.6, 3.1, -0.4], 0.6);
+  return wallSpots;
+}
+
+function setupLounge(THREE, scene) {
+  // The front-left corner by the garden windows used to be bare floor. A rug, two low
+  // chairs and a table give it a job without adding a seventh table to the floor plan.
+  const lounge = new THREE.Group();
+  lounge.name = 'lounge-corner';
+  lounge.position.set(-7.1, 0, 9.9);
+  scene.add(lounge);
+
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 3.4), makeMaterial(THREE, '#6a6f57', { roughness: 0.94 }));
+  rug.name = 'lounge-rug';
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(0, 0.04, 0);
+  rug.receiveShadow = true;
+  lounge.add(rug);
+
+  const armchair = (x, z, rotation, upholstery) => {
+    const chair = new THREE.Group();
+    chair.position.set(x, 0, z);
+    chair.rotation.y = rotation;
+    lounge.add(chair);
+    roundedBox(THREE, chair, 'lounge-chair-seat', [1.15, 0.32, 1.0], [0, 0.52, 0], upholstery, { radius: 0.16, bevel: 0.03, material: velvetMaterial(THREE, upholstery) });
+    roundedBox(THREE, chair, 'lounge-chair-back', [1.15, 0.85, 0.24], [0, 1.05, -0.42], upholstery, { radius: 0.14, bevel: 0.026, material: velvetMaterial(THREE, upholstery) });
+    for (const side of [-1, 1]) {
+      roundedBox(THREE, chair, 'lounge-chair-arm', [0.16, 0.42, 0.92], [side * 0.6, 0.72, 0.02], upholstery, { radius: 0.08, bevel: 0.02, material: velvetMaterial(THREE, upholstery) });
+      for (const dz of [-0.36, 0.36]) box(THREE, chair, 'lounge-chair-leg', [0.07, 0.34, 0.07], [side * 0.48, 0.17, dz], '#7d5a3a', { material: brassMaterial(THREE, '#7d5a3a') });
+    }
+    addContactShadow(THREE, chair, MATERIAL_LIBRARY?.textures, { radius: 1.1, strength: 0.4 });
+  };
+  armchair(-1.25, 0.1, 0.35, '#35604a');
+  armchair(1.35, -0.15, -0.4, '#a8542f');
+
+  cylinder(THREE, lounge, 'lounge-table-top', 0.62, 0.62, 0.09, [0, 0.46, 0.1], '#8a6142', 18, { material: woodMaterial(THREE, '#8a6142') });
+  cylinder(THREE, lounge, 'lounge-table-pedestal', 0.12, 0.18, 0.44, [0, 0.22, 0.1], '#5c452f', 12, { material: woodMaterial(THREE, '#5c452f') });
+  cylinder(THREE, lounge, 'lounge-table-foot', 0.3, 0.34, 0.05, [0, 0.025, 0.1], '#5c452f', 16, { material: woodMaterial(THREE, '#5c452f') });
+  cylinder(THREE, lounge, 'lounge-cup', 0.09, 0.11, 0.16, [0.2, 0.58, 0.08], '#e6dfd0', 10, { material: ceramicMaterial(THREE, '#e6dfd0') });
+  box(THREE, lounge, 'lounge-book', [0.32, 0.05, 0.24], [-0.22, 0.53, 0.18], '#7c8b70');
+
+  // A low bookcase closes the front edge, and a planter softens the corner.
+  roundedBox(THREE, lounge, 'lounge-bookcase', [2.4, 1.4, 0.4], [0.2, 0.7, 1.62], '#4a3526', { radius: 0.04, bevel: 0.012, material: woodMaterial(THREE, '#4a3526') });
+  for (let book = 0; book < 14; book += 1) {
+    box(THREE, lounge, 'lounge-bookcase-book', [0.11, 0.34, 0.2], [-0.82 + book * 0.16, 0.92, 1.62], ['#7c8b70', '#a8542f', '#c9b184', '#546b5b'][book % 4], { castShadow: false });
+  }
+  addPottedPlant(THREE, scene, 'plant-lounge', -4.4, 10.8, 1.1);
+
+  // A glass bake case on the right of the room, so that side is not bare floor either.
+  const bakeCase = new THREE.Group();
+  bakeCase.name = 'bake-case';
+  bakeCase.position.set(9.55, 0, 3.4);
+  bakeCase.rotation.y = -0.35;
+  scene.add(bakeCase);
+  roundedBox(THREE, bakeCase, 'bake-case-base', [1.5, 1.0, 0.9], [0, 0.5, 0], '#5a4029', { radius: 0.05, bevel: 0.016, material: woodMaterial(THREE, '#5a4029') });
+  roundedBox(THREE, bakeCase, 'bake-case-top', [1.56, 0.08, 0.96], [0, 1.04, 0], '#8a674a', { radius: 0.03, bevel: 0.01, material: woodMaterial(THREE, '#8a674a') });
+  box(THREE, bakeCase, 'bake-case-glass', [1.36, 0.72, 0.78], [0, 1.44, 0], '#cfe0d8', { material: makeMaterial(THREE, '#cfe0d8', { roughness: 0.16, transparent: true, opacity: 0.34 }), castShadow: false });
+  for (let cake = 0; cake < 3; cake += 1) {
+    cylinder(THREE, bakeCase, 'bake-case-cake', 0.16, 0.18, 0.14, [-0.42 + cake * 0.42, 1.13, 0.05], ['#c98a5c', '#e6cf9a', '#a9724a'][cake], 10);
+  }
+  addPottedPlant(THREE, scene, 'plant-right', 9.7, 7.4, 1.15);
 }
 
 function setupRoom(THREE, scene) {
@@ -462,7 +977,7 @@ function setupRoom(THREE, scene) {
   oakCanvas.width = 512;
   oakCanvas.height = 512;
   const oakContext = oakCanvas.getContext('2d');
-  oakContext.fillStyle = '#816348';
+  oakContext.fillStyle = '#6f4a2f';
   oakContext.fillRect(0, 0, 512, 512);
   let plankSeed = 27;
   const plankRandom = () => {
@@ -471,11 +986,11 @@ function setupRoom(THREE, scene) {
   };
   for (let row = 0; row < 12; row += 1) {
     const plankHeight = 512 / 12;
-    oakContext.fillStyle = ['#8d6d4e', '#795b40', '#947252', '#846247'][row % 4];
+    oakContext.fillStyle = ['#7b5335', '#6f4a2f', '#845a3a', '#744d31'][row % 4];
     oakContext.fillRect(0, row * plankHeight, 512, plankHeight - 2);
     for (let grain = 0; grain < 13; grain += 1) {
       const y = row * plankHeight + plankRandom() * (plankHeight - 3);
-      oakContext.strokeStyle = plankRandom() > 0.5 ? 'rgba(58, 38, 26, .13)' : 'rgba(218, 184, 135, .12)';
+      oakContext.strokeStyle = plankRandom() > 0.5 ? 'rgba(58, 38, 23, .26)' : 'rgba(214, 178, 133, .16)';
       oakContext.lineWidth = 1 + plankRandom() * 2;
       oakContext.beginPath();
       oakContext.moveTo(plankRandom() * 30, y);
@@ -488,32 +1003,38 @@ function setupRoom(THREE, scene) {
   oakTexture.wrapS = THREE.RepeatWrapping;
   oakTexture.wrapT = THREE.RepeatWrapping;
   oakTexture.repeat.set(2, 1);
-  const floor = box(THREE, scene, 'warm-oak-floor', [22, 0.36, 21], [0, -0.18, 1.75], '#ffffff', {
-    material: makeMaterial(THREE, '#ded4c0', { map: oakTexture, roughness: 0.84 }),
+  // Warm walnut boards run the length of the room; the rugs, velvet and marble still
+  // carry the colour, they just sit on brown instead of pale stone now.
+  const floor = box(THREE, scene, 'walnut-plank-floor', [22, 0.36, 21], [0, -0.18, 1.75], '#ffffff', {
+    material: makeMaterial(THREE, '#e8d3bb', { map: oakTexture, roughness: 0.52 }),
   });
   floor.receiveShadow = true;
-  const tileLines = makeMaterial(THREE, '#604a37', { roughness: 0.96, transparent: true, opacity: 0.32 });
+  const tileLines = makeMaterial(THREE, '#4a3220', { roughness: 0.94, transparent: true, opacity: 0.42 });
   for (let x = -10; x <= 10; x += 2) box(THREE, scene, 'floor-board-joint', [0.025, 0.012, 20.8], [x, 0.01, 1.75], tileLines, { castShadow: false, receiveShadow: false, material: tileLines });
   for (let z = -8; z <= 12; z += 2) box(THREE, scene, 'floor-board-joint', [21.8, 0.012, 0.025], [0, 0.01, z], tileLines, { castShadow: false, receiveShadow: false, material: tileLines });
 
-  const wall = makeMaterial(THREE, '#c6baa2');
+  // Warm clay plaster instead of the old grey: it sits closer to the wood, the neon and
+  // the paintings, and it is the wall colour the evening room wants too.
+  const wall = plasterMaterial(THREE, '#7c6650');
   // A framed open-kitchen pass keeps the cooking line visible while the staff door stays private.
-  box(THREE, scene, 'back-wall-left-return', [1.1, 7.2, 0.4], [-10.25, 3.6, -8.75], wall);
-  box(THREE, scene, 'open-kitchen-header', [6.5, 1.4, 0.4], [-7.0, 6.5, -8.75], wall);
-  box(THREE, scene, 'open-kitchen-sill', [6.5, 1.5, 0.4], [-7.0, 0.75, -8.75], wall);
-  box(THREE, scene, 'back-wall-left-pier', [0.9, 7.2, 0.4], [-3.65, 3.6, -8.75], wall);
-  box(THREE, scene, 'back-wall-right', [11.4, 7.2, 0.4], [5.1, 3.6, -8.75], wall);
-  box(THREE, scene, 'staff-passage-lintel', [2.6, 3.6, 0.4], [-1.9, 5.4, -8.75], wall);
-  box(THREE, scene, 'back-wall-wainscot-left', [1.02, 1.25, 0.08], [-10.25, 0.95, -8.51], '#514237');
-  box(THREE, scene, 'back-wall-wainscot-right', [11.25, 1.25, 0.08], [5.1, 0.95, -8.51], '#514237');
-  box(THREE, scene, 'staff-access-screen', [0.18, 3.8, 2.0], [-3.05, 1.9, -9.75], '#89785f');
+  // `wall` goes in the options, not the colour slot: a material passed as a colour
+  // silently falls back to white, which is what kept these walls flat and pale.
+  box(THREE, scene, 'back-wall-left-return', [1.1, 7.2, 0.4], [-10.25, 3.6, -8.75], '#7e807b', { material: wall });
+  box(THREE, scene, 'open-kitchen-header', [6.5, 1.4, 0.4], [-7.0, 6.5, -8.75], '#7e807b', { material: wall });
+  box(THREE, scene, 'open-kitchen-sill', [6.5, 1.5, 0.4], [-7.0, 0.75, -8.75], '#7e807b', { material: wall });
+  box(THREE, scene, 'back-wall-left-pier', [0.9, 7.2, 0.4], [-3.65, 3.6, -8.75], '#7e807b', { material: wall });
+  box(THREE, scene, 'back-wall-right', [11.4, 7.2, 0.4], [5.1, 3.6, -8.75], '#7e807b', { material: wall });
+  box(THREE, scene, 'staff-passage-lintel', [2.6, 3.6, 0.4], [-1.9, 5.4, -8.75], '#7e807b', { material: wall });
+  box(THREE, scene, 'back-wall-wainscot-left', [1.02, 1.25, 0.08], [-10.25, 0.95, -8.51], '#3f4243', { material: makeMaterial(THREE, '#3f4243', { roughness: 0.78 }) });
+  box(THREE, scene, 'back-wall-wainscot-right', [11.25, 1.25, 0.08], [5.1, 0.95, -8.51], '#3f4243', { material: makeMaterial(THREE, '#3f4243', { roughness: 0.78 }) });
+  box(THREE, scene, 'staff-access-screen', [0.18, 3.8, 2.0], [-3.05, 1.9, -9.75], '#6e716c');
   box(THREE, scene, 'staff-door-frame', [2.5, 4.7, 0.22], [-1.9, 2.35, -8.48], '#624a32');
   box(THREE, scene, 'staff-door', [2.23, 4.42, 0.12], [-1.9, 2.21, -8.32], '#604b34', { materialOptions: { roughness: 0.75 } });
   box(THREE, scene, 'staff-door-inset', [1.74, 3.55, 0.045], [-1.9, 2.16, -8.24], '#766044', { castShadow: false });
   cylinder(THREE, scene, 'staff-door-handle', 0.07, 0.07, 0.12, [-1.12, 1.45, -8.15], '#c1a16a', 10, { materialOptions: { metalness: 0.65, roughness: 0.25 } });
   addLabel(THREE, scene, 'STAFF ONLY', 1.65, 0.38, [-1.9, 4.75, -8.22], { background: '#514237', color: '#eee4d2', border: '#aa8961' });
-  box(THREE, scene, 'left-cutaway-wall', [0.4, 7.2, 5.5], [-10.85, 3.6, -5.4], '#89785f');
-  box(THREE, scene, 'left-wall-front', [0.4, 7.2, 8.7], [-10.85, 3.6, 7.3], '#89785f');
+  box(THREE, scene, 'left-cutaway-wall', [0.4, 7.2, 5.5], [-10.85, 3.6, -5.4], '#6e716c', { material: wall });
+  box(THREE, scene, 'left-wall-front', [0.4, 7.2, 8.7], [-10.85, 3.6, 7.3], '#6e716c', { material: wall });
 
   box(THREE, scene, 'kitchen-pass-timber-left', [0.15, 4.55, 0.18], [-9.72, 3.78, -8.43], '#654b35');
   box(THREE, scene, 'kitchen-pass-timber-right', [0.15, 4.55, 0.18], [-4.28, 3.78, -8.43], '#654b35');
@@ -538,19 +1059,82 @@ function setupRoom(THREE, scene) {
   addLabel(THREE, scene, 'COFFEE  •  LUNCH  •  BAKES', 4.1, 0.54, [3.8, 4.55, -8.38], { background: '#65513b', color: '#e9ddc8', border: '#a9875f' });
   addMenuBoard(THREE, scene, [0.82, 3.3, -8.42]);
 
+  // The coral neon sign from the reference wall. Unlike the evening decoration it is
+  // lit all day too; the night mix only turns it up.
+  const neonMaterial = new THREE.MeshBasicMaterial({
+    map: neonTexture(THREE, ['GOOD VIBES', '& COFFEE'], '#ff7a5c'),
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const neon = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 1.45), neonMaterial);
+  neon.name = 'wall-neon-sign';
+  neon.position.set(8.35, 5.35, -8.42);
+  scene.add(neon);
+  const neonHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: MATERIAL_LIBRARY?.textures.softDot,
+    color: '#ff6b45',
+    transparent: true,
+    opacity: 0.18,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  }));
+  neonHalo.name = 'wall-neon-halo';
+  neonHalo.position.set(8.35, 5.35, -8.34);
+  neonHalo.scale.set(4.6, 3.2, 1);
+  scene.add(neonHalo);
+
+  // Framed prints between the windows, the way the reference wall is hung.
+  for (const [z, tone] of [[3.0, '#b9a98f'], [6.9, '#9fae9c']]) {
+    box(THREE, scene, 'wall-print-frame', [0.06, 1.5, 1.15], [-10.62, 3.3, z], '#3a3d3c', { material: makeMaterial(THREE, '#3a3d3c', { roughness: 0.6 }) });
+    box(THREE, scene, 'wall-print-art', [0.03, 1.28, 0.94], [-10.58, 3.3, z], tone, { material: makeMaterial(THREE, tone, { roughness: 0.86 }), castShadow: false });
+  }
+
+  // Two tall arched windows on the dining-room wall, with daylight behind them.
+  const windowGlass = [];
+  for (const z of [4.7, 9.0]) {
+    const arched = addArchWindow(THREE, scene, `courtyard-window-${z}`, { x: -10.62, z, width: 2.0, height: 3.6, base: 0.95 });
+    windowGlass.push(arched.glassMaterial);
+  }
+
+  // Greenery by the windows and the bar, as in the reference room.
+  addPottedPlant(THREE, scene, 'plant-window', -9.7, 6.9, 1.15);
+  addPottedPlant(THREE, scene, 'plant-entry', -9.7, 1.4, 1);
+  addPottedPlant(THREE, scene, 'plant-bar', 9.6, -7.4, 1.2);
+
+  // The pendants are the night lighting, so the scene keeps a handle on them.
+  const pendantLights = [];
+  const lampGlows = [];
   for (const x of [-8.3, -1.2, 5.2, 9.1]) {
-    const cord = cylinder(THREE, scene, 'lamp-cord', 0.025, 0.025, 1.35, [x, 5.9, -1.6], '#514238', 6);
-    const shade = cylinder(THREE, scene, 'pendant-shade', 0.58, 0.34, 0.36, [x, 5.17, -1.6], '#b28e5d', 10);
-    cylinder(THREE, scene, 'lamp-glow', 0.31, 0.31, 0.06, [x, 4.96, -1.6], '#f3dfb7', 10, { materialOptions: { emissive: '#d1a866', emissiveIntensity: 0.8 } });
+    const cord = cylinder(THREE, scene, 'lamp-cord', 0.018, 0.018, 1.6, [x, 5.95, -1.6], '#2c2924', 6);
+    // Brass domes with an exposed bulb hanging below, the row of pendants the
+    // reference café runs down the room.
+    const shade = cylinder(THREE, scene, 'pendant-shade', 0.16, 0.56, 0.34, [x, 5.12, -1.6], '#a9834a', 14, { material: brassMaterial(THREE, '#a9834a') });
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.19, 12, 8),
+      makeMaterial(THREE, '#ffe3b6', { emissive: '#e8b46a', emissiveIntensity: 0.8, roughness: 0.4 }),
+    );
+    glow.name = 'lamp-glow';
+    glow.position.set(x, 4.94, -1.6);
+    glow.castShadow = false;
+    scene.add(glow);
     const point = new THREE.PointLight('#eed2a2', 12, 8, 2);
     point.position.set(x, 4.7, -1.6);
     scene.add(point);
+    pendantLights.push(point);
+    lampGlows.push(glow);
     cord.castShadow = false;
     shade.castShadow = true;
   }
 
-  // A clear central service aisle separates guests from tables and kitchen traffic.
-  box(THREE, scene, 'service-aisle-runner', [19.6, 0.015, 1.18], [0, 0.025, -1.7], '#a68b6c', { materialOptions: { roughness: 1 }, castShadow: false });
+  // Wall dressing: paintings, stickers, slats, the chalkboard and the console under the
+  // art, plus the wash lights that keep it readable after dark.
+  const wallSpots = setupWallDecor(THREE, scene);
+
+  return { pendantLights, lampGlows, wallMaterial: wall, neonMaterial, windowGlass, wallSpots };
 }
 
 function setupCourtyard(THREE, scene) {
@@ -581,9 +1165,10 @@ function setupCourtyard(THREE, scene) {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  box(THREE, scene, 'entry-path', [9.5, 0.16, 2.2], [-15.6, -0.28, -1.65], '#b4a888', { materialOptions: { roughness: 0.95 } });
-  for (let index = 0; index < 5; index += 1) {
-    const stone = box(THREE, scene, 'entry-paving-joint', [0.055, 0.012, 2.15], [-12.0 - index * 1.65, -0.19, -1.65], '#8d8065', { castShadow: false, receiveShadow: false });
+  // The path now stops at the pavement rather than running on into the lane.
+  box(THREE, scene, 'entry-path', [6.6, 0.16, 2.2], [-14.1, -0.28, -1.65], '#b4a888', { materialOptions: { roughness: 0.95 } });
+  for (let index = 0; index < 3; index += 1) {
+    const stone = box(THREE, scene, 'entry-paving-joint', [0.055, 0.012, 2.15], [-12.4 - index * 1.55, -0.19, -1.65], '#8d8065', { castShadow: false, receiveShadow: false });
     stone.rotation.y = 0.03;
   }
 
@@ -611,7 +1196,9 @@ function setupCourtyard(THREE, scene) {
   const foliageColors = ['#4f6544', '#637650', '#75845a', '#89916a', '#526947'];
   const addTree = (x, z, scale = 1) => {
     const tree = new THREE.Group();
-    tree.position.set(x, 0, z);
+    // The courtyard grass sits at y -0.42; the trunk is bedded 2 cm into it so the
+    // trees no longer hover over the lawn next to the terrace.
+    tree.position.set(x, -0.44, z);
     tree.scale.setScalar(scale);
     scene.add(tree);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.46, 3.05, 12, 4), barkMaterial);
@@ -767,7 +1354,9 @@ function setupCourtyard(THREE, scene) {
   }
 
   // Low clipped hedges and flowering borders soften the bare edges of the courtyard.
-  for (const [x, z, width] of [[-17.5, 1.2, 4.4], [16.4, 4.8, 4.6], [-12.4, 12.8, 5.2]]) {
+  // The old front hedge ran across the pavement and terrace paving that now occupy the
+  // ground west of the café, so it is cut back to the grass verge beside the gate.
+  for (const [x, z, width] of [[-16.68, 1.42, 1.2], [16.4, 4.8, 4.6], [-12.4, 12.8, 5.2]]) {
     box(THREE, scene, 'garden-hedge', [width, 0.82, 1.05], [x, -0.01, z], '#66734e', { materialOptions: { roughness: 0.98 } });
     for (let index = 0; index < 5; index += 1) {
       const flower = new THREE.Mesh(
@@ -781,11 +1370,11 @@ function setupCourtyard(THREE, scene) {
   }
 
   for (const [x, z, width] of [[-8.2, 14.0, 5.2], [1.4, 15.0, 6.8], [12.3, 6.3, 3.0], [-13.3, -5.4, 2.8]]) {
-    box(THREE, scene, 'courtyard-planter', [width, 0.44, 1.3], [x, -0.16, z], '#77634a');
+    box(THREE, scene, 'courtyard-planter', [width, 0.44, 1.3], [x, -0.21, z], '#77634a');
     for (let offset = -width / 2 + 0.45; offset < width / 2; offset += 0.6) {
-      cylinder(THREE, scene, 'courtyard-herb-pot', 0.2, 0.24, 0.33, [x + offset, 0.2, z], '#927655', 9);
+      cylinder(THREE, scene, 'courtyard-herb-pot', 0.2, 0.24, 0.33, [x + offset, 0.17, z], '#927655', 9);
       const herb = new THREE.Mesh(new THREE.SphereGeometry(0.33, 9, 8), makeMaterial(THREE, offset % 1.2 ? '#6d7b55' : '#879064', { roughness: 0.95 }));
-      herb.position.set(x + offset, 0.55, z);
+      herb.position.set(x + offset, 0.52, z);
       herb.castShadow = true;
       scene.add(herb);
     }
@@ -846,11 +1435,15 @@ function setupKitchen(THREE, scene) {
   kitchen.name = 'staff-only-kitchen';
   kitchen.position.z = -7.5;
   scene.add(kitchen);
-  box(THREE, kitchen, 'kitchen-zone', [7.6, 0.08, 6.4], [-6.55, 0.04, -5.3], '#827b6d');
+  box(THREE, kitchen, 'kitchen-zone', [7.6, 0.08, 6.4], [-6.55, 0.04, -5.3], '#827b6d', { material: tileMaterial(THREE, '#8a8374') });
   box(THREE, kitchen, 'kitchen-left-wall', [0.3, 5.8, 7.2], [-10.55, 2.9, -5.25], '#b2a68e');
   box(THREE, kitchen, 'kitchen-back-wall', [8.0, 5.8, 0.3], [-6.55, 2.9, -8.85], '#b2a68e');
-  box(THREE, kitchen, 'stainless-range', [5.5, 1.15, 1.25], [-7.15, 0.61, -4.35], '#858984', { materialOptions: { metalness: 0.52, roughness: 0.42 } });
-  box(THREE, kitchen, 'range-top', [5.75, 0.12, 1.48], [-7.15, 1.23, -4.35], '#b2b3ad', { materialOptions: { metalness: 0.65, roughness: 0.32 } });
+  const rangeShadowAnchor = new THREE.Group();
+  rangeShadowAnchor.position.set(-7.15, 0.03, -4.35);
+  kitchen.add(rangeShadowAnchor);
+  addContactShadow(THREE, rangeShadowAnchor, MATERIAL_LIBRARY?.textures, { radius: 3.1, y: 0, strength: 0.45, scaleZ: 0.42 });
+  roundedBox(THREE, kitchen, 'stainless-range', [5.5, 1.15, 1.25], [-7.15, 0.61, -4.35], '#8f938d', { radius: 0.07, bevel: 0.022, material: steelMaterial(THREE, '#8f938d') });
+  roundedBox(THREE, kitchen, 'range-top', [5.75, 0.12, 1.48], [-7.15, 1.23, -4.35], '#b9bab3', { radius: 0.05, bevel: 0.014, material: steelMaterial(THREE, '#b9bab3', { roughness: 0.28 }) });
   for (const x of [-9.2, -7.7, -6.2, -4.7]) {
     cylinder(THREE, kitchen, 'burner-ring', 0.42, 0.42, 0.07, [x, 1.34, -4.35], '#343b38', 12, { materialOptions: { metalness: 0.65 } });
     cylinder(THREE, kitchen, 'burner-glow', 0.19, 0.19, 0.08, [x, 1.4, -4.35], '#c47a45', 10, { materialOptions: { emissive: '#a94f2e', emissiveIntensity: 0.65 } });
@@ -862,32 +1455,62 @@ function setupKitchen(THREE, scene) {
     kitchen.add(lid);
     pot.userData.steam = true;
   }
-  box(THREE, kitchen, 'prep-table', [2.9, 0.18, 1.35], [-3.45, 1.12, -4.45], '#b2b4ad', { materialOptions: { metalness: 0.44 } });
+  roundedBox(THREE, kitchen, 'prep-table', [2.9, 0.18, 1.35], [-3.45, 1.12, -4.45], '#b2b4ad', { radius: 0.06, bevel: 0.016, material: steelMaterial(THREE, '#b6b8b1') });
   for (const x of [-4.5, -3.2, -2.0]) box(THREE, kitchen, 'prep-table-leg', [0.14, 1.06, 0.14], [x, 0.54, -4.45], '#6c716e');
   box(THREE, kitchen, 'cutting-board', [1.15, 0.1, 0.8], [-3.45, 1.26, -4.45], '#a9855c');
   for (const x of [-3.8, -3.5, -3.2]) cylinder(THREE, kitchen, 'chopped-vegetables', 0.13, 0.13, 0.08, [x, 1.36, -4.42], '#777b58', 7);
   box(THREE, kitchen, 'backsplash', [7.4, 1.2, 0.16], [-6.45, 2.2, -7.85], '#665a49');
-  box(THREE, kitchen, 'kitchen-shelf', [6.6, 0.16, 0.62], [-6.45, 3.0, -7.5], '#73543a');
+  roundedBox(THREE, kitchen, 'kitchen-shelf', [6.6, 0.16, 0.62], [-6.45, 3.0, -7.5], '#73543a', { radius: 0.05, bevel: 0.014, material: woodMaterial(THREE, '#73543a') });
   for (let x = -9.3; x <= -3.6; x += 0.8) cylinder(THREE, kitchen, 'shelf-jar', 0.16, 0.17, 0.44, [x, 3.3, -7.48], x < -6 ? '#d7cbb2' : '#7d8068', 8);
+
+  // The kitchen had no light of its own, only emissive burners. Two ceiling strips and a
+  // warm pool over the range keep the back line readable in the evening room.
+  const kitchenLights = [];
+  const kitchenPanels = [];
+  for (const x of [-8.4, -4.8]) {
+    box(THREE, kitchen, 'kitchen-strip-housing', [2.4, 0.14, 0.34], [x, 4.56, -6.4], '#585349', { material: steelMaterial(THREE, '#585349'), castShadow: false });
+    const panel = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 0.05, 0.24),
+      new THREE.MeshBasicMaterial({ color: '#fff1d4', toneMapped: false }),
+    );
+    panel.name = 'kitchen-strip-light';
+    panel.position.set(x, 4.46, -6.4);
+    kitchen.add(panel);
+    kitchenPanels.push(panel);
+    const light = new THREE.PointLight('#ffdca6', 5, 7.5, 2);
+    light.position.set(x, 4.28, -6.2);
+    light.castShadow = false;
+    kitchen.add(light);
+    kitchenLights.push(light);
+  }
+  // A lit strip under the shelf picks out the jars.
+  box(THREE, kitchen, 'kitchen-shelf-led', [6.2, 0.03, 0.04], [-6.45, 2.86, -7.18], '#ffe3b6', { material: new THREE.MeshBasicMaterial({ color: '#ffe3b6', toneMapped: false }), castShadow: false });
 
   const cooks = [
     addHuman(THREE, kitchen, { x: -8.3, z: -6.25, role: 'cook', shirt: '#e6dfd1', skin: '#be896c', hair: '#40352c' }),
     addHuman(THREE, kitchen, { x: -5.4, z: -6.25, role: 'cook', shirt: '#e6dfd1', skin: '#d0a080', hair: '#352e29' }),
     addHuman(THREE, kitchen, { x: -4.3, z: -5.8, role: 'cook', shirt: '#9b7456', skin: '#9d7158', hair: '#2b2b29' }),
   ];
-  return cooks;
+  return { cooks, lights: kitchenLights, panels: kitchenPanels };
 }
 
 function setupPickup(THREE, scene, orders) {
   box(THREE, scene, 'pickup-zone', [4.8, 0.08, 4], [6.65, 0.05, -5.3], '#8a7960');
-  box(THREE, scene, 'service-counter-base', [4.15, 1.25, 1.45], [6.7, 0.65, -4.45], '#62452f');
-  box(THREE, scene, 'counter-front-inlay', [3.85, 0.66, 0.08], [6.7, 0.68, -3.71], '#8c6845');
-  box(THREE, scene, 'service-counter-top', [4.42, 0.18, 1.7], [6.7, 1.34, -4.45], '#ac8963');
-  box(THREE, scene, 'counter-edge', [4.48, 0.12, 0.1], [6.7, 1.34, -3.62], '#c7aa7a');
+  // Dark walnut bar with brass trim, the counter from the reference room.
+  roundedBox(THREE, scene, 'service-counter-base', [4.15, 1.25, 1.45], [6.7, 0.65, -4.45], '#3f2c1f', { radius: 0.08, bevel: 0.02, material: woodMaterial(THREE, '#3f2c1f') });
+  box(THREE, scene, 'counter-front-inlay', [3.85, 0.66, 0.08], [6.7, 0.68, -3.71], '#4b3524', { material: woodMaterial(THREE, '#4b3524') });
+  roundedBox(THREE, scene, 'service-counter-top', [4.42, 0.18, 1.7], [6.7, 1.34, -4.45], '#8a674a', { radius: 0.06, bevel: 0.018, material: woodMaterial(THREE, '#8a674a') });
+  roundedBox(THREE, scene, 'counter-edge', [4.48, 0.12, 0.1], [6.7, 1.34, -3.62], '#c09a5b', { radius: 0.04, bevel: 0.01, material: brassMaterial(THREE, '#c09a5b') });
+  cylinder(THREE, scene, 'counter-foot-rail', 0.045, 0.045, 3.7, [6.7, 0.26, -3.62], '#c09a5b', 10, { material: brassMaterial(THREE, '#c09a5b') }).rotation.z = Math.PI / 2;
+  box(THREE, scene, 'counter-brass-band', [3.9, 0.06, 0.05], [6.7, 1.05, -3.67], '#c09a5b', { material: brassMaterial(THREE, '#c09a5b'), castShadow: false });
+  const counterShadowAnchor = new THREE.Group();
+  counterShadowAnchor.position.set(6.7, 0, -4.4);
+  scene.add(counterShadowAnchor);
+  addContactShadow(THREE, counterShadowAnchor, MATERIAL_LIBRARY?.textures, { radius: 2.9, y: 0.03, strength: 0.5, scaleZ: 0.55 });
   box(THREE, scene, 'screen-mount', [4.3, 2.6, 0.25], [6.7, 3.35, -7.65], '#38332d');
   const display = addLabel(THREE, scene, '', 3.9, 1.9, [6.7, 3.45, -7.48], { background: '#25231f', color: '#e4d9c2' });
   addLabel(THREE, scene, 'ORDER STATUS', 2.05, 0.36, [6.7, 2.03, -7.38], { background: '#514237', color: '#eee4d2', border: '#aa8961' });
-  box(THREE, scene, 'pickup-shelf', [4.15, 0.16, 0.7], [6.7, 2.0, -6.8], '#8e6b47');
+  roundedBox(THREE, scene, 'pickup-shelf', [4.15, 0.16, 0.7], [6.7, 2.0, -6.8], '#8e6b47', { radius: 0.05, bevel: 0.014, material: woodMaterial(THREE, '#8e6b47') });
   cylinder(THREE, scene, 'ready-beacon-stem', 0.07, 0.09, 0.45, [9.12, 4.73, -7.45], '#665642', 8);
   const readyBeacon = new THREE.Mesh(
     new THREE.SphereGeometry(0.24, 10, 8),
@@ -900,14 +1523,14 @@ function setupPickup(THREE, scene, orders) {
   const tray = new THREE.Group();
   tray.position.set(6.6, 1.68, -4.2);
   scene.add(tray);
-  cylinder(THREE, tray, 'handoff-tray', 0.55, 0.55, 0.07, [0, 0, 0], '#e2d8c5', 14);
+  cylinder(THREE, tray, 'handoff-tray', 0.55, 0.55, 0.07, [0, 0, 0], '#e2d8c5', 14, { material: ceramicMaterial(THREE, '#e2d8c5') });
   cylinder(THREE, tray, 'handoff-food', 0.31, 0.31, 0.14, [0, 0.11, 0], '#a9653f', 9);
   const readyFood = [];
   for (let i = 0; i < 5; i += 1) {
     const plate = new THREE.Group();
     plate.position.set(5.05 + i * 0.82, 0, -3.93);
     scene.add(plate);
-    cylinder(THREE, plate, 'ready-order-plate', 0.36, 0.36, 0.07, [0, 1.48, 0], '#e9e1d1', 16);
+    cylinder(THREE, plate, 'ready-order-plate', 0.36, 0.36, 0.07, [0, 1.48, 0], '#e9e1d1', 16, { material: ceramicMaterial(THREE, '#e9e1d1') });
     cylinder(THREE, plate, 'ready-order-meal', 0.24, 0.24, 0.15, [0, 1.59, 0], ['#ad6943', '#9b8150', '#787a59', '#b5804c', '#986345'][i], 9);
     cylinder(THREE, plate, 'ready-garnish', 0.09, 0.09, 0.07, [0.1, 1.69, 0], '#78815e', 8);
     plate.visible = false;
@@ -917,17 +1540,19 @@ function setupPickup(THREE, scene, orders) {
   return { display, tray, readyFood, readyBeacon };
 }
 
-const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus = null, onGuestCompleted, kitchenFocusOrder = null, onKitchenCameraStage }) => {
+const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus = null, onGuestCompleted, kitchenFocusOrder = null, onKitchenCameraStage, ambientMode = 'day' }) => {
   const hostRef = useRef(null);
-  const dataRef = useRef({ tables, orders, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus, onGuestCompleted, kitchenFocusOrder, onKitchenCameraStage });
+  const dataRef = useRef({ tables, orders, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus, onGuestCompleted, kitchenFocusOrder, onKitchenCameraStage, ambientMode });
   useEffect(() => {
-    dataRef.current = { tables, orders, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus, onGuestCompleted, kitchenFocusOrder, onKitchenCameraStage };
-  }, [tables, orders, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus, onGuestCompleted, kitchenFocusOrder, onKitchenCameraStage]);
+    dataRef.current = { tables, orders, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus, onGuestCompleted, kitchenFocusOrder, onKitchenCameraStage, ambientMode };
+  }, [tables, orders, onSelectTable, onSelectStation, onSelectSceneFeature, onSceneFocusStage, sceneFocus, onGuestCompleted, kitchenFocusOrder, onKitchenCameraStage, ambientMode]);
 
   useEffect(() => {
     const THREE = window.THREE;
     const host = hostRef.current;
     if (!THREE || !host) return undefined;
+
+    MATERIAL_LIBRARY = createMaterialLibrary(THREE);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#d6ded1');
@@ -938,11 +1563,17 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.94;
+    renderer.toneMappingExposure = 0.9;
     renderer.domElement.className = 'cafe-three-canvas';
     renderer.domElement.setAttribute('aria-label', 'Interactive three dimensional café. Click a table to watch a guest or order food. Click the kitchen, counter, pond, or trees to watch them in motion. Press 1 to 6 for a table, or O for order status.');
     renderer.domElement.tabIndex = 0;
     host.appendChild(renderer.domElement);
+
+    // Image-based lighting from a tiny procedural room: this is what gives metal, glass
+    // and glaze something to reflect instead of reading as flat paint.
+    const dayEnvironment = buildEnvironmentMap(THREE, renderer, 'day');
+    const nightEnvironment = buildEnvironmentMap(THREE, renderer, 'night');
+    scene.environment = dayEnvironment.texture;
 
     const camera = new THREE.OrthographicCamera(-20, 20, 20, -20, 0.1, 140);
     const cameraAngle = { theta: 0.31, phi: 0.88, radius: 54 };
@@ -955,27 +1586,280 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
     let cameraTransition = null;
     let cameraMode = 'default';
 
-    const hemi = new THREE.HemisphereLight('#f5f2e6', '#514735', 0.82);
+    // The room opens slowly: it starts wider, higher and further out than the fixed
+    // camera, then glides in over a few seconds. It rides the normal camera transition,
+    // so a click on a table or the kitchen simply takes over from where the glide got to.
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+    const introDuration = 3.4;
+    if (!reduceMotion) {
+      const introPosition = homeCameraPosition.clone().multiplyScalar(1.14);
+      introPosition.y += 7.5;
+      const introZoom = 0.78;
+      camera.position.copy(introPosition);
+      camera.zoom = introZoom;
+      camera.lookAt(cameraTarget);
+      camera.updateProjectionMatrix();
+      cameraTransition = {
+        start: 0,
+        duration: introDuration,
+        fromPosition: introPosition.clone(),
+        fromTarget: cameraTarget.clone(),
+        fromZoom: introZoom,
+        toPosition: homeCameraPosition.clone(),
+        toTarget: homeCameraTarget.clone(),
+        toZoom: 1,
+        mode: 'default',
+        isOrderFocus: false,
+        sceneFocusId: undefined,
+        orderId: '',
+      };
+    }
+
+    // The environment map now supplies the soft ambient fill, so the flat hemisphere
+    // comes down and the two key lights do more of the shaping.
+    const hemi = new THREE.HemisphereLight('#f5f2e6', '#514735', 0.32);
     scene.add(hemi);
-    const sun = new THREE.DirectionalLight('#ffe8c7', 1.85);
+    const sun = new THREE.DirectionalLight('#ffe8c7', 1.4);
     sun.position.set(-16, 25, 18);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.radius = 4;
     sun.shadow.normalBias = 0.035;
-    sun.shadow.camera.left = -19;
-    sun.shadow.camera.right = 19;
-    sun.shadow.camera.top = 21;
-    sun.shadow.camera.bottom = -20;
+    // Tightened to the room itself: the same 2048 map now covers ~2x the texels per
+    // metre, so chair legs and mug rims hold a readable shadow.
+    sun.shadow.camera.left = -13;
+    sun.shadow.camera.right = 13;
+    sun.shadow.camera.top = 15;
+    sun.shadow.camera.bottom = -14;
     sun.shadow.bias = -0.0005;
     scene.add(sun);
-    const fill = new THREE.DirectionalLight('#e4e9df', 0.34);
+    const fill = new THREE.DirectionalLight('#e4e9df', 0.18);
     fill.position.set(13, 14, 5);
     scene.add(fill);
 
+    // A soft warm pool over the dining rows, the way the pendant lamps actually read on
+    // the tables rather than only on the shades themselves.
+    const diningGlow = new THREE.SpotLight('#ffd7a4', 4.5, 17, 1.05, 0.9, 1.4);
+    diningGlow.position.set(0, 6.2, 1.3);
+    diningGlow.target.position.set(0, 0.9, 1.3);
+    diningGlow.castShadow = false;
+    scene.add(diningGlow);
+    scene.add(diningGlow.target);
+
+    // A modern café keeps the counter the brightest surface after dark, so the bar gets
+    // its own small pool instead of leaning on the dining light.
+    const counterGlow = new THREE.SpotLight('#ffe2c2', 2.2, 13, 0.95, 0.8, 1.5);
+    counterGlow.position.set(6.7, 5.4, -3.4);
+    counterGlow.target.position.set(6.7, 1.2, -4.7);
+    counterGlow.castShadow = false;
+    scene.add(counterGlow);
+    scene.add(counterGlow.target);
+
     const courtyard = setupCourtyard(THREE, scene);
-    setupRoom(THREE, scene);
-    const cooks = setupKitchen(THREE, scene);
+    const room = setupRoom(THREE, scene);
+    // The lane, terrace, shopfront, street furniture, neighbours and sky.
+    const surroundings = setupSurroundings(THREE, scene);
+    // Slow drifting mist over the garden, terrace, lane and the room itself.
+    const mist = setupMist(THREE, scene);
+
+    // Morning light through the entry door: a warm pool on the boards plus drifting
+    // dust, the cheapest honest cue that the room is lit by a real window.
+    const lightShaft = addLightShaft(THREE, scene, MATERIAL_LIBRARY?.textures);
+    const dustCount = 90;
+    const dustSeeds = [];
+    const dustPositions = new Float32Array(dustCount * 3);
+    for (let index = 0; index < dustCount; index += 1) {
+      const seed = {
+        x: -10 + (((index * 71) % 100) / 100) * 6.6,
+        y: 0.18 + (((index * 29) % 100) / 100) * 2.6,
+        z: -3.8 + (((index * 53) % 100) / 100) * 3.9,
+        speed: 0.12 + (((index * 17) % 100) / 100) * 0.2,
+        rise: 0.05 + (((index * 13) % 100) / 100) * 0.07,
+        phase: (((index * 41) % 100) / 100) * Math.PI * 2,
+      };
+      dustSeeds.push(seed);
+      dustPositions[index * 3] = seed.x;
+      dustPositions[index * 3 + 1] = seed.y;
+      dustPositions[index * 3 + 2] = seed.z;
+    }
+    const dustGeometry = new THREE.BufferGeometry();
+    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dustMotes = new THREE.Points(dustGeometry, new THREE.PointsMaterial({
+      map: MATERIAL_LIBRARY?.textures.softDot,
+      color: '#ffeccb',
+      size: 0.07,
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+      toneMapped: false,
+    }));
+    dustMotes.name = 'entry-dust';
+    dustMotes.frustumCulled = false;
+    scene.add(dustMotes);
+
+    // Evening decoration: neon, backlit menu, shelf LEDs, table candles and courtyard
+    // string lights. Hidden by day and faded in with the night mix below.
+    const nightDecor = setupNightDecor(THREE, scene, MATERIAL_LIBRARY?.textures, { tables: TABLE_SPOTS });
+
+    // Lamps and rigs are filled in once the furniture exists; the lighting pass reads
+    // them through these handles.
+    const tableLamps = [];
+    let kitchenRig = null;
+
+    // ---- Lighting states -----------------------------------------------------
+    // The room can sit in morning light or in the evening with the pendants on. Each
+    // value is described twice and blended per frame, so switching is a slow dimming
+    // of the room rather than a hard cut between two looks.
+    const DAY_LIGHT = {
+      background: new THREE.Color('#d6ded1'),
+      hemiSky: new THREE.Color('#f5f2e6'),
+      hemiGround: new THREE.Color('#514735'),
+      hemi: 0.32,
+      sun: new THREE.Color('#ffe8c7'),
+      sunIntensity: 1.4,
+      fill: 0.18,
+      glow: new THREE.Color('#ffd7a4'),
+      glowIntensity: 4.5,
+      counter: new THREE.Color('#ffe2c2'),
+      counterIntensity: 2.2,
+      streetLamp: new THREE.Color('#ffd7a0'),
+      streetLampIntensity: 0,
+      lampGlass: 0.05,
+      lantern: new THREE.Color('#ffcf96'),
+      lanternIntensity: 0,
+      lanternGlass: 0.08,
+      neighbourWindows: 0,
+      awning: new THREE.Color('#f3e7d3'),
+      lampColor: new THREE.Color('#eed2a2'),
+      lampIntensity: 12,
+      lampEmissive: 0.8,
+      shaft: 0.24,
+      dust: 0.4,
+      exposure: 0.9,
+      wall: new THREE.Color('#7c6650'),
+      glass: new THREE.Color('#eaf2f0'),
+      tableLamp: new THREE.Color('#ffd9a6'),
+      tableLampIntensity: 2.2,
+      tableBulb: 0.7,
+      wallSpot: new THREE.Color('#ffcf96'),
+      wallSpotIntensity: 2.2,
+      kitchen: new THREE.Color('#ffdca6'),
+      kitchenIntensity: 4,
+      kitchenPanel: new THREE.Color('#fff1d4'),
+    };
+    const NIGHT_LIGHT = {
+      background: new THREE.Color('#0c1315'),
+      hemiSky: new THREE.Color('#22343a'),
+      hemiGround: new THREE.Color('#120e0a'),
+      hemi: 0.17,
+      sun: new THREE.Color('#8ea6bd'),
+      sunIntensity: 0.08,
+      fill: 0.03,
+      glow: new THREE.Color('#ff9a5c'),
+      glowIntensity: 2.6,
+      counter: new THREE.Color('#ffbe7d'),
+      counterIntensity: 6.5,
+      streetLamp: new THREE.Color('#ffc281'),
+      streetLampIntensity: 5.5,
+      lampGlass: 1.15,
+      lantern: new THREE.Color('#ffb877'),
+      lanternIntensity: 3.2,
+      lanternGlass: 1.1,
+      neighbourWindows: 1.05,
+      awning: new THREE.Color('#5c4a3c'),
+      lampColor: new THREE.Color('#ffb873'),
+      lampIntensity: 22,
+      lampEmissive: 1.7,
+      shaft: 0,
+      dust: 0.16,
+      exposure: 1.06,
+      // Charcoal walls and a cool window: the room goes dark and the neon carries it.
+      wall: new THREE.Color('#332b27'),
+      glass: new THREE.Color('#1c2a32'),
+      tableLamp: new THREE.Color('#ffbe86'),
+      tableLampIntensity: 9,
+      tableBulb: 1.9,
+      wallSpot: new THREE.Color('#ffb877'),
+      wallSpotIntensity: 7.5,
+      kitchen: new THREE.Color('#ffc98a'),
+      kitchenIntensity: 9,
+      kitchenPanel: new THREE.Color('#ffe0a8'),
+    };
+    let nightness = dataRef.current.ambientMode === 'night' ? 1 : 0;
+
+    const applyLighting = (mix) => {
+      const blend = THREE.MathUtils.lerp;
+      scene.background.copy(DAY_LIGHT.background).lerp(NIGHT_LIGHT.background, mix);
+      if (scene.fog) scene.fog.color.copy(scene.background);
+      hemi.color.copy(DAY_LIGHT.hemiSky).lerp(NIGHT_LIGHT.hemiSky, mix);
+      hemi.groundColor.copy(DAY_LIGHT.hemiGround).lerp(NIGHT_LIGHT.hemiGround, mix);
+      hemi.intensity = blend(DAY_LIGHT.hemi, NIGHT_LIGHT.hemi, mix);
+      sun.color.copy(DAY_LIGHT.sun).lerp(NIGHT_LIGHT.sun, mix);
+      sun.intensity = blend(DAY_LIGHT.sunIntensity, NIGHT_LIGHT.sunIntensity, mix);
+      fill.intensity = blend(DAY_LIGHT.fill, NIGHT_LIGHT.fill, mix);
+      diningGlow.color.copy(DAY_LIGHT.glow).lerp(NIGHT_LIGHT.glow, mix);
+      diningGlow.intensity = blend(DAY_LIGHT.glowIntensity, NIGHT_LIGHT.glowIntensity, mix);
+      counterGlow.color.copy(DAY_LIGHT.counter).lerp(NIGHT_LIGHT.counter, mix);
+      counterGlow.intensity = blend(DAY_LIGHT.counterIntensity, NIGHT_LIGHT.counterIntensity, mix);
+      room.pendantLights.forEach((light) => {
+        light.color.copy(DAY_LIGHT.lampColor).lerp(NIGHT_LIGHT.lampColor, mix);
+        light.intensity = blend(DAY_LIGHT.lampIntensity, NIGHT_LIGHT.lampIntensity, mix);
+      });
+      room.lampGlows.forEach((glow) => {
+        if (glow.material) glow.material.emissiveIntensity = blend(DAY_LIGHT.lampEmissive, NIGHT_LIGHT.lampEmissive, mix);
+      });
+      room.wallSpots?.forEach((spot) => {
+        spot.color.copy(DAY_LIGHT.wallSpot).lerp(NIGHT_LIGHT.wallSpot, mix);
+        spot.intensity = blend(DAY_LIGHT.wallSpotIntensity, NIGHT_LIGHT.wallSpotIntensity, mix);
+      });
+      tableLamps.forEach(({ light, bulb }) => {
+        light.color.copy(DAY_LIGHT.tableLamp).lerp(NIGHT_LIGHT.tableLamp, mix);
+        light.intensity = blend(DAY_LIGHT.tableLampIntensity, NIGHT_LIGHT.tableLampIntensity, mix);
+        if (bulb?.material) bulb.material.emissiveIntensity = blend(DAY_LIGHT.tableBulb, NIGHT_LIGHT.tableBulb, mix);
+      });
+      kitchenRig?.lights?.forEach((light) => {
+        light.color.copy(DAY_LIGHT.kitchen).lerp(NIGHT_LIGHT.kitchen, mix);
+        light.intensity = blend(DAY_LIGHT.kitchenIntensity, NIGHT_LIGHT.kitchenIntensity, mix);
+      });
+      kitchenRig?.panels?.forEach((panel) => {
+        if (panel.material?.color) panel.material.color.copy(DAY_LIGHT.kitchenPanel).lerp(NIGHT_LIGHT.kitchenPanel, mix);
+      });
+      if (room.wallMaterial) room.wallMaterial.color.copy(DAY_LIGHT.wall).lerp(NIGHT_LIGHT.wall, mix);
+      if (room.neonMaterial) room.neonMaterial.opacity = blend(0.85, 1, mix);
+      room.windowGlass?.forEach((material) => {
+        material.color.copy(DAY_LIGHT.glass).lerp(NIGHT_LIGHT.glass, mix);
+      });
+      if (lightShaft?.material) lightShaft.material.opacity = blend(DAY_LIGHT.shaft, NIGHT_LIGHT.shaft, mix);
+      if (dustMotes?.material) dustMotes.material.opacity = blend(DAY_LIGHT.dust, NIGHT_LIGHT.dust, mix);
+      // Outdoors: the sky crossfades, the streetlamps and the door lantern come up, the
+      // neighbours light two windows each and the awning darkens with the street.
+      surroundings.skyDay.material.opacity = 1 - mix;
+      surroundings.skyNight.material.opacity = mix;
+      surroundings.streetLamps.forEach(({ light }) => {
+        light.color.copy(DAY_LIGHT.streetLamp).lerp(NIGHT_LIGHT.streetLamp, mix);
+        light.intensity = blend(DAY_LIGHT.streetLampIntensity, NIGHT_LIGHT.streetLampIntensity, mix);
+      });
+      if (surroundings.lampGlass) surroundings.lampGlass.emissiveIntensity = blend(DAY_LIGHT.lampGlass, NIGHT_LIGHT.lampGlass, mix);
+      if (surroundings.doorLantern) {
+        surroundings.doorLantern.color.copy(DAY_LIGHT.lantern).lerp(NIGHT_LIGHT.lantern, mix);
+        surroundings.doorLantern.intensity = blend(DAY_LIGHT.lanternIntensity, NIGHT_LIGHT.lanternIntensity, mix);
+      }
+      if (surroundings.lanternGlass) surroundings.lanternGlass.emissiveIntensity = blend(DAY_LIGHT.lanternGlass, NIGHT_LIGHT.lanternGlass, mix);
+      surroundings.windowMaterials.forEach((material) => {
+        material.emissiveIntensity = blend(DAY_LIGHT.neighbourWindows, NIGHT_LIGHT.neighbourWindows, mix);
+      });
+      if (surroundings.awningMaterial) surroundings.awningMaterial.color.copy(DAY_LIGHT.awning).lerp(NIGHT_LIGHT.awning, mix);
+      nightDecor.setMix(mix);
+      renderer.toneMappingExposure = blend(DAY_LIGHT.exposure, NIGHT_LIGHT.exposure, mix);
+      const nextEnvironment = mix > 0.5 ? nightEnvironment.texture : dayEnvironment.texture;
+      if (scene.environment !== nextEnvironment) scene.environment = nextEnvironment;
+    };
+    applyLighting(nightness);
+
+    kitchenRig = setupKitchen(THREE, scene);
+    const cooks = kitchenRig.cooks;
     const combinedTables = [...FALLBACK_TABLES];
     const liveTables = new Map((dataRef.current.tables || []).map((table) => [table.tableId, table]));
     const currentOrders = dataRef.current.orders || {};
@@ -984,6 +1868,13 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
       return table;
     });
     const tableMeshes = physicalTables.map((table, index) => createTable(THREE, scene, table, TABLE_SPOTS[index], index));
+    tableMeshes.forEach((record) => {
+      if (record.lamp) tableLamps.push({ light: record.lamp, bulb: record.bulb });
+    });
+    setupLounge(THREE, scene);
+    // The lamps were built after the first lighting pass, so seat them in the current
+    // morning or evening mix before the first frame.
+    applyLighting(nightness);
     setupDiningGuests(THREE, scene, tableMeshes);
     const pickup = setupPickup(THREE, scene, currentOrders);
     const cashier = addHuman(THREE, scene, {
@@ -996,15 +1887,39 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
     server.userData.armPivots[1].add(pickup.tray);
     pickup.tray.position.set(0, -0.36, 0.2);
 
-    const panSteam = [];
-    for (const x of [-9.2, -7.7, -6.2, -4.7]) {
-      for (let p = 0; p < 4; p += 1) {
-        const steam = new THREE.Mesh(new THREE.SphereGeometry(0.075 + p * 0.01, 6, 5), new THREE.MeshBasicMaterial({ color: '#fff1d4', transparent: true, opacity: 0.3 }));
-        steam.position.set(x + (p % 2) * 0.12, 2.05 + p * 0.18, -11.85);
-        scene.add(steam);
-        panSteam.push({ mesh: steam, phase: p * 0.7 + x });
-      }
+    // Steam over the pans is one soft particle cloud instead of sixteen spheres: it
+    // reads as vapour rather than bubbles, and costs a single draw call.
+    const burnerX = [-9.2, -7.7, -6.2, -4.7];
+    const steamCount = 72;
+    const steamSeeds = [];
+    const steamPositions = new Float32Array(steamCount * 3);
+    for (let index = 0; index < steamCount; index += 1) {
+      const seed = {
+        burner: burnerX[index % burnerX.length],
+        life: (index * 0.137) % 1,
+        drift: ((index * 37) % 100) / 100 - 0.5,
+      };
+      steamSeeds.push(seed);
+      steamPositions[index * 3] = seed.burner + seed.drift * 0.3;
+      steamPositions[index * 3 + 1] = 2.06 + seed.life * 1.2;
+      steamPositions[index * 3 + 2] = -11.85 + seed.drift * 0.5;
     }
+    const steamGeometry = new THREE.BufferGeometry();
+    steamGeometry.setAttribute('position', new THREE.BufferAttribute(steamPositions, 3));
+    const steamCloud = new THREE.Points(steamGeometry, new THREE.PointsMaterial({
+      map: MATERIAL_LIBRARY?.textures.softDot,
+      color: '#fff3dc',
+      size: 0.4,
+      transparent: true,
+      opacity: 0.17,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+      toneMapped: false,
+    }));
+    steamCloud.name = 'kitchen-steam';
+    steamCloud.frustumCulled = false;
+    scene.add(steamCloud);
 
     // Guests share the clear aisle and are time-staggered so their paths never cross tables.
     const walkers = [
@@ -1025,6 +1940,7 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
     const pointer = new THREE.Vector2();
     const clock = new THREE.Clock();
     let animationFrame = 0;
+    let lastFrameTime = 0;
     let lastBoardSignature = '';
     let previousReady = (dataRef.current.orders.ready || []).length;
     let transferStartedAt = previousReady ? -5 : -10;
@@ -1144,6 +2060,15 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
     const animate = () => {
       animationFrame = window.requestAnimationFrame(animate);
       const time = clock.getElapsedTime();
+      const delta = Math.min(0.12, Math.max(0, time - lastFrameTime));
+      lastFrameTime = time;
+      const nightTarget = dataRef.current.ambientMode === 'night' ? 1 : 0;
+      if (nightness !== nightTarget) {
+        const step = Math.min(Math.abs(nightTarget - nightness), delta * 1.4);
+        nightness += Math.sign(nightTarget - nightness) * step;
+        if (Math.abs(nightTarget - nightness) < 0.002) nightness = nightTarget;
+        applyLighting(nightness);
+      }
       const currentOrders = dataRef.current.orders || {};
       const focusOrder = dataRef.current.kitchenFocusOrder;
       const activeSceneFocus = dataRef.current.sceneFocus;
@@ -1217,7 +2142,9 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
         const tableShowcase = activeSceneFocus?.place === 'table' && activeSceneFocus.tableId === tableId;
         const liveTable = (dataRef.current.tables || []).find((table) => table.tableId === tableId);
         const isOccupied = liveTable ? liveTable.status === 'occupied' : record.table.status === 'occupied';
-        const seatGuests = isOccupied || tableShowcase;
+        // Guests are seated only at a table that is really occupied. Clicking a table
+        // zooms the camera, it never conjures people onto a free or reserved table.
+        const seatGuests = isOccupied;
         record.reservedMarker.visible = liveTable ? liveTable.status === 'reserved' : record.table.status === 'reserved';
         // When a fresh table order arrives and nobody is yet walking to/from this table,
         // start the guest pickup journey right away (not only when the order reaches Ready).
@@ -1232,11 +2159,6 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
             if (!journeyAlreadyQueued) beginGuestJourney(unresolvedHere, currentOrders.ready || [], time);
           }
         }
-        const unresolvedOrders = dineInOrders.filter((order) => {
-          const id = String(order._id || order.orderNumber || order.displayOrderId);
-          const journeyFinished = [...guestJourneys.values()].some((item) => item.id === id && item.phase === 'complete');
-          return orderTableId(order) === tableId && !completedJourneyIds.has(id) && !journeyFinished;
-        });
         const journey = [...guestJourneys.values()].find((item) => item.tableId === tableId && item.phase !== 'complete');
         record.ambientGuests.forEach((guest, guestIndex) => {
           guest.visible = !journey && seatGuests;
@@ -1269,11 +2191,13 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
         record.ambientDishes.forEach((dish) => { dish.visible = !journey && seatGuests; });
         // The showcase dish mirrors the seated guests' plate setting so the table looks
         // consistent with the people sitting at it during a table showcase.
-        record.showcaseDish.visible = tableShowcase && !journey;
+        record.showcaseDish.visible = tableShowcase && seatGuests && !journey;
         if (record.guest) {
+          const hasCompletedJourney = [...guestJourneys.values()].some((item) => item.tableId === tableId && item.phase === 'complete');
+          // A leftover seat must clear itself the moment the table is released, so the
+          // room keeps matching the live status instead of holding a stale diner.
           if (journey) record.guest.visible = journey.phase === 'eat';
-          else if (unresolvedOrders.length) record.guest.visible = true;
-          else if ([...guestJourneys.values()].some((item) => item.tableId === tableId && item.phase === 'complete')) record.guest.visible = false;
+          else record.guest.visible = isOccupied && !hasCompletedJourney;
         }
       });
       const readyCount = (currentOrders.ready || []).length;
@@ -1484,14 +2408,58 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
           if (phase > 0.72) person.visible = false;
         }
       });
-      panSteam.forEach(({ mesh, phase }) => {
-        const cycle = (time * 0.7 + phase) % 2.1;
-        mesh.position.y = 2.08 + cycle * 0.72;
-        mesh.position.x += Math.sin(time + phase) * 0.0008;
-        mesh.material.opacity = Math.max(0, 0.28 * (1 - cycle / 2.1));
-      });
+      const steamAttribute = steamGeometry.attributes.position;
+      for (let index = 0; index < steamCount; index += 1) {
+        const seed = steamSeeds[index];
+        const cycle = (time * 0.17 + seed.life) % 1;
+        steamAttribute.array[index * 3] = seed.burner + seed.drift * (0.25 + cycle * 0.7);
+        steamAttribute.array[index * 3 + 1] = 2.06 + cycle * 1.3;
+        steamAttribute.array[index * 3 + 2] = -11.85 + seed.drift * 0.55;
+      }
+      steamAttribute.needsUpdate = true;
+      const dustAttribute = dustGeometry.attributes.position;
+      for (let index = 0; index < dustCount; index += 1) {
+        const seed = dustSeeds[index];
+        dustAttribute.array[index * 3] = seed.x + Math.sin(time * seed.speed + seed.phase) * 0.32;
+        dustAttribute.array[index * 3 + 1] = seed.y + (((time * seed.rise + seed.phase) % 1) * 0.55);
+        dustAttribute.array[index * 3 + 2] = seed.z + Math.cos(time * seed.speed * 0.8 + seed.phase) * 0.28;
+      }
+      dustAttribute.needsUpdate = true;
+      // Opening mist: thick over the first moment, then a light drift that stays.
+      const mistOpen = reduceMotion ? 1 : Math.min(1, time / introDuration);
+      mist.update(time, 1.4 - (1 - (1 - mistOpen) ** 3) * 0.95, nightness);
+      if (debugTimer) debugFrames.count += 1;
       renderer.render(scene, camera);
     };
+
+    // Measurement hook: draw calls, triangles and frame rate, development builds only.
+    // Add ?debugScene=1 to the URL to see the numbers in the console.
+    const debugFrames = { count: 0 };
+    let debugTimer = null;
+    if (import.meta.env.DEV) {
+      window.__cafeScene = {
+        THREE,
+        renderer,
+        scene,
+        camera,
+        // Dev helper: jump between the two lighting states without clicking.
+        setAmbient: (mode) => {
+          nightness = mode === 'night' ? 1 : 0;
+          applyLighting(nightness);
+        },
+      };
+      if (new URLSearchParams(window.location.search).has('debugScene')) {
+        let reportedAt = performance.now();
+        debugTimer = window.setInterval(() => {
+          const now = performance.now();
+          const fps = Math.round((debugFrames.count * 1000) / Math.max(1, now - reportedAt));
+          console.info(`[cafe] ${fps} fps · ${renderer.info.render.calls} draw calls · ${renderer.info.render.triangles} triangles`);
+          debugFrames.count = 0;
+          reportedAt = now;
+        }, 1000);
+      }
+    }
+
     animate();
 
     return () => {
@@ -1506,6 +2474,12 @@ const CafeScene = ({ tables = [], orders = {}, onSelectTable, onSelectStation, o
         if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
         else object.material?.dispose?.();
       });
+      if (debugTimer) window.clearInterval(debugTimer);
+      if (window.__cafeScene) delete window.__cafeScene;
+      dayEnvironment.dispose();
+      nightEnvironment.dispose();
+      MATERIAL_LIBRARY?.dispose();
+      MATERIAL_LIBRARY = null;
       renderer.dispose();
       renderer.domElement.remove();
     };

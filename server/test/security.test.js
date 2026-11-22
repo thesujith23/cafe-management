@@ -71,6 +71,10 @@ test('order writes require a staff session', async () => {
 
   const clear = await call('/api/orders/651111111111111111111111', { method: 'DELETE' });
   assert.equal(clear.status, 401);
+
+  // Manual pickup messages are a counter/owner action only.
+  const notify = await call('/api/orders/651111111111111111111111/notify', { method: 'POST' });
+  assert.equal(notify.status, 401);
 });
 
 test('staff order reads require a session', async () => {

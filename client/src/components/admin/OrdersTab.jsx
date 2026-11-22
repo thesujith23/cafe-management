@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { CheckCircle2, Eye, Search, User, X } from 'lucide-react';
+import { BellRing, CheckCircle2, Eye, Search, User, X } from 'lucide-react';
 import OrderProgressCell from './OrderProgressCell';
-import { formatINR } from '../../utils/formatters';
+import { formatINR, formatTimeOnly } from '../../utils/formatters';
 import { guestName, itemWord, orderItemCount, orderTableCode, orderTableLabel } from '../../utils/orderDisplay';
 
 // Every status lands in one of these four views; Active is the working default.
@@ -15,7 +15,7 @@ const FILTERS = [
 // The statuses this table has no direct action for, and where they go next.
 const NEXT_STAGE = { waiting_payment: 'new', accepted: 'preparing' };
 
-const OrdersTab = ({ orders, filter, onFilterChange, onAdvanceStatus, onInspect }) => {
+const OrdersTab = ({ orders, filter, onFilterChange, onAdvanceStatus, onInspect, onNotifyGuest }) => {
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
   const visibleOrders = needle
@@ -157,15 +157,6 @@ const OrdersTab = ({ orders, filter, onFilterChange, onAdvanceStatus, onInspect 
                           Confirm
                         </button>
                       )}
-                      {order.preparationStatus === 'confirmed' && (
-                        <button
-                          onClick={() => onAdvanceStatus(order._id, 'preparing')}
-                          className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-space_indigo to-dusty_mauve text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
-                          title="Start cooking this confirmed ticket"
-                        >
-                          Cook
-                        </button>
-                      )}
                       {order.preparationStatus === 'preparing' && (
                         <button
                           onClick={() => onAdvanceStatus(order._id, 'ready')}
@@ -177,6 +168,16 @@ const OrdersTab = ({ orders, filter, onFilterChange, onAdvanceStatus, onInspect 
                       )}
                       {order.preparationStatus === 'ready' && (
                         <button
+                          onClick={() => onNotifyGuest(order)}
+                          className="px-2.5 py-1 rounded-xl bg-white border border-emerald-300 text-emerald-800 font-bold text-[11px] flex items-center gap-1 hover:bg-emerald-50 transition-colors cursor-pointer"
+                          title="Ring the guest's tracker again — at most once a minute"
+                        >
+                          <BellRing className="w-3.5 h-3.5" />
+                          <span>Notify guest</span>
+                        </button>
+                      )}
+                      {order.preparationStatus === 'ready' && (
+                        <button
                           onClick={() => onAdvanceStatus(order._id, 'served')}
                           className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
                           title="Customer picked up order • Handover and clear from TV display board"
@@ -184,6 +185,9 @@ const OrdersTab = ({ orders, filter, onFilterChange, onAdvanceStatus, onInspect 
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Handover & Clear</span>
                         </button>
+                      )}
+                      {order.preparationStatus === 'confirmed' && (
+                        <span className="text-[10px] text-thistle-400 font-aleo">Waiting for kitchen to accept</span>
                       )}
                       {NEXT_STAGE[order.preparationStatus] && (
                         <button
@@ -201,6 +205,13 @@ const OrdersTab = ({ orders, filter, onFilterChange, onAdvanceStatus, onInspect 
                         <Eye className="w-4 h-4" />
                       </button>
                     </div>
+                    {order.preparationStatus === 'ready' && (
+                      <div className="mt-1 text-[10px] text-thistle-400 font-aleo">
+                        {order.guestNotifiedAt
+                          ? `Notified ${formatTimeOnly(order.guestNotifiedAt)}${(order.guestNotifyCount || 0) > 1 ? ` · ${order.guestNotifyCount}×` : ''}`
+                          : 'Guest not notified yet'}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))

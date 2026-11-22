@@ -10,6 +10,7 @@ import {
   BellRing,
   CheckCircle2,
   ChefHat,
+  ClipboardCheck,
   Clock3,
   LoaderCircle,
   RefreshCw,
@@ -23,6 +24,7 @@ import '../styles/customer-order.css';
 
 const STEPS = [
   { key: 'new', label: 'Received', icon: ShoppingBag },
+  { key: 'accepted', label: 'Accepted', icon: ClipboardCheck },
   { key: 'preparing', label: 'Cooking', icon: ChefHat },
   { key: 'ready', label: 'Ready', icon: BellRing },
   { key: 'served', label: 'Enjoy', icon: CheckCircle2 },
@@ -44,6 +46,14 @@ const OrderStatusPage = () => {
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(null);
   const [cancelNotice, setCancelNotice] = useState('');
   const [cancelling, setCancelling] = useState(false);
+
+  // Ready-for-pickup alerts. The system-notification permission is only requested when
+  // the guest taps the bell, never on load, so a first visit stays quiet.
+  const [alertsPermission, setAlertsPermission] = useState(() => (
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  ));
+  const [alertsNotice, setAlertsNotice] = useState('');
+  const shownNotifications = useRef(new Set());
 
   // Live second timer for 1-minute countdowns
   useEffect(() => {
@@ -116,6 +126,26 @@ const OrderStatusPage = () => {
       });
     };
 
+    // The server records a notification when the kitchen marks a ticket ready and rings
+    // this room. Show it as a system alert if the guest has allowed that.
+    const handleNotification = (payload) => {
+      if (!payload || payload.type !== 'order_ready') return;
+      const key = payload._id || `${payload.orderId}-${payload.createdAt}`;
+      if (shownNotifications.current.has(key)) return;
+      shownNotifications.current.add(key);
+
+      if (typeof window === 'undefined' || !('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+      try {
+        new Notification(payload.title, {
+          body: payload.message,
+          tag: `order-${payload.orderId}`,
+        });
+      } catch {
+        // Some browsers refuse constructor notifications without a service worker.
+      }
+    };
+
     // A dish came off the line: take the ticket and its progress as the server sent them.
     const handleItemsUpdate = (updatedOrder) => {
       if (!updatedOrder?._id) return;
@@ -129,6 +159,7 @@ const OrderStatusPage = () => {
     socket.on('order:cancelled', handleStatusChanged);
     socket.on('order:items:update', handleItemsUpdate);
     socket.on('order:paid', handleOrderPaid);
+    socket.on('notification:new', handleNotification);
 
     return () => {
       socket.off('order:status:changed', handleStatusChanged);
@@ -136,6 +167,7 @@ const OrderStatusPage = () => {
       socket.off('order:cancelled', handleStatusChanged);
       socket.off('order:items:update', handleItemsUpdate);
       socket.off('order:paid', handleOrderPaid);
+      socket.off('notification:new', handleNotification);
     };
   }, [socket, token, joinRoom]);
 
@@ -217,6 +249,31 @@ const OrderStatusPage = () => {
     }
   };
 
+  const handleAlertsClick = async () => {
+    if (alertsPermission === 'unsupported') {
+      setAlertsNotice('This browser cannot show system alerts — keep this page open and it will chime.');
+      return;
+    }
+    if (alertsPermission === 'granted') {
+      setAlertsNotice('Alerts are already on for this device.');
+      return;
+    }
+    if (alertsPermission === 'denied') {
+      setAlertsNotice('Alerts are blocked for this site. Allow notifications in your browser settings to turn them on.');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setAlertsPermission(permission);
+      setAlertsNotice(permission === 'granted'
+        ? 'Alerts on — we will ring when your food is ready at the counter.'
+        : 'Alerts stay off — keep this page open and it will still chime when your food is ready.');
+    } catch {
+      setAlertsNotice('Alerts could not be enabled on this device.');
+    }
+  };
+
   const getStepIndex = (status) => {
     switch (status) {
       case 'waiting_payment':
@@ -227,12 +284,12 @@ const OrderStatusPage = () => {
       case 'accepted':
         return 1;
       case 'preparing':
-        return 1;
-      case 'ready':
         return 2;
+      case 'ready':
+        return 3;
       case 'completed':
       case 'served':
-        return 3;
+        return 4;
       default:
         return 0;
     }
@@ -250,12 +307,25 @@ const OrderStatusPage = () => {
         <div className="order-table-chip"><span>Ordering at</span><strong>{tableLabel}</strong></div>
         <div className="order-header-actions">
           <Link to={'/table/' + token} className="order-back-menu"><ArrowLeft size={15} /><span>Menu</span></Link>
+          {alertsPermission !== 'unsupported' && (
+            <button
+              type="button"
+              className="order-refresh-button"
+              onClick={handleAlertsClick}
+              aria-pressed={alertsPermission === 'granted'}
+              aria-label="Turn on pickup alerts"
+            >
+              <BellRing size={15} />
+              <span>{alertsPermission === 'granted' ? 'Alerts on' : alertsPermission === 'denied' ? 'Alerts blocked' : 'Enable alerts'}</span>
+            </button>
+          )}
           <button type="button" className="order-refresh-button" onClick={() => fetchOrders(true)} disabled={refreshing} aria-label="Refresh order status"><RefreshCw size={15} className={refreshing ? 'is-spinning' : ''} /><span>Refresh</span></button>
         </div>
       </header>
 
       <main className="order-status-main">
         {loadError && <div className="order-load-error" role="alert"><AlertCircle size={16} /><span>{loadError}</span><button type="button" onClick={() => fetchOrders(true)}>Try again</button></div>}
+        {alertsNotice && <p className="order-cancel-note" role="status">{alertsNotice}</p>}
 
         {loading ? (
           <div className="order-state-screen order-inline-state"><LoaderCircle className="order-spinner" /><p>Loading your orders…</p></div>
@@ -271,7 +341,7 @@ const OrderStatusPage = () => {
             {orders.map((order) => {
               const progress = order.progress || null;
               const percent = Math.max(0, Math.min(100, progress?.percent ?? 0));
-              // The server counts five stages (accepted is its own); this rail has four.
+              // The rail mirrors the server's stages: received, accepted, cooking, ready, enjoyed.
               const stageIndex = getStepIndex(progress?.stage || order.preparationStatus);
               const awaitingPayment = order.preparationStatus === 'waiting_payment';
               const isReady = order.preparationStatus === 'ready';
@@ -296,7 +366,7 @@ const OrderStatusPage = () => {
 
               return (
                 <article className={'order-live-card ' + (isReady ? 'is-ready ' : '') + (isCancelled ? 'is-cancelled ' : '') + (highlightOrderId === order._id ? 'is-highlighted' : '')} key={order._id}>
-                  {isReady && <div className="order-ready-banner"><BellRing size={16} /><strong>Ready at the counter</strong><span>Please collect your food</span></div>}
+                  {isReady && <div className="order-ready-banner"><BellRing size={16} /><strong>Ready at the counter</strong><span>Please collect your food{order.readyAt ? ` · ready at ${formatTimeOnly(order.readyAt)}` : ''}</span></div>}
                   {isCancelled && <div className="order-cancelled-banner"><XCircle size={16} /><strong>Order cancelled</strong><span>{order.cancelReason || 'Cancelled by customer'}</span></div>}
                   <div className="order-live-card-head">
                     <div><span className="order-ticket-label">Order</span><h2>{order.orderNumber || ('#' + String(order._id).slice(-5))}</h2><small>Placed {formatDateTime(order.createdAt)}</small></div>
@@ -341,6 +411,7 @@ const OrderStatusPage = () => {
                       {canCancelOnline ? <button type="button" className="order-cancel-button" onClick={() => handleCancelClick(order)}><XCircle size={14} />Cancel order · {remainingCancelSeconds}s</button> : <button type="button" className="order-cancel-button is-muted" onClick={() => handleCancelClick(order)}><Store size={14} />Need to cancel?</button>}
                       {order.preparationStatus === 'new' && <span>Paid — waiting for the counter to check your order.</span>}
                       {order.preparationStatus === 'confirmed' && <span>Checked at the counter — your ticket is with the kitchen.</span>}
+                      {order.preparationStatus === 'accepted' && <span>The kitchen has accepted your order and will start cooking shortly.</span>}
                     </div>}
                     {!isCancelled && !isCompleted && cancelNotice && (
                       <p className="order-cancel-note">{cancelNotice}</p>

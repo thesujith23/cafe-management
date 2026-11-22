@@ -203,6 +203,21 @@ const AdminDashboardPage = () => {
     setSelectedOrderForModal((prev) => (prev && prev._id === updated._id ? updated : prev));
   };
 
+  // Ring the guest again that their order is waiting at the counter.
+  const handleNotifyGuest = async (order) => {
+    try {
+      const response = await orderApi.notifyGuest(order._id);
+      if (!response?.success) throw new Error(response?.message || 'The guest could not be notified.');
+      applyUpdatedOrder(response.data?.order);
+      toast.success(`Guest notified for ${order.orderNumber}`);
+    } catch (err) {
+      // 429 (the cooldown) is already announced by the axios interceptor.
+      if (err.response?.status !== 429) {
+        toast.error(err.response?.data?.message || err.message || 'The guest could not be notified.');
+      }
+    }
+  };
+
   // Tick one dish off the ticket, or put it back in the pan.
   const handleToggleItem = async (order, item) => {
     try {
@@ -549,6 +564,7 @@ const AdminDashboardPage = () => {
             onFilterChange={setOrderStatusFilter}
             onAdvanceStatus={handleUpdateOrderStatus}
             onInspect={setSelectedOrderForModal}
+            onNotifyGuest={handleNotifyGuest}
           />
         )}
 

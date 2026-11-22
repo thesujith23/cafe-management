@@ -14,14 +14,14 @@ const getInitialTime = () => {
   return toLocalDateTime(date);
 };
 
-const BookingModal = ({ onClose, onBooked }) => {
+const BookingModal = ({ onClose, onBooked, initialTableId = '' }) => {
   const [minimumTime] = useState(() => toLocalDateTime(new Date(Date.now() + 60 * 60 * 1000)));
   const [tables, setTables] = useState([]);
   const [loadingTables, setLoadingTables] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [confirmation, setConfirmation] = useState(null);
-  const [form, setForm] = useState({ customerName: '', customerPhone: '', guests: '2', startsAt: getInitialTime(), tableId: '', notes: '' });
+  const [form, setForm] = useState({ customerName: '', customerPhone: '', guests: '2', startsAt: getInitialTime(), tableId: initialTableId, notes: '' });
 
   useEffect(() => {
     let active = true;

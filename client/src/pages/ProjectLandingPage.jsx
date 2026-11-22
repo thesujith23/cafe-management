@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowDown, CalendarDays, Coffee } from 'lucide-react';
 import BookingModal from '../components/cafe/BookingModal';
 import { tableApi } from '../api/apiServices';
+import { useSocket } from '../context/SocketContext';
+import { summariseTables } from '../utils/tableAvailability';
 import '../styles/landing-window.css';
 
 const PASS_STAGES = [
@@ -38,7 +40,7 @@ const PASS_STAGES = [
     label: 'At the pass',
     short: 'Pass',
     time: 'Ready',
-    title: 'Called by ticket, not by queue.',
+    title: 'The pass calls your ticket.',
     body: 'When the plate is dressed the pass marks the ticket ready. The screen above the counter calls that number, and the same board still shows everything cooking behind it.',
     facts: [
       { key: 'You', value: 'Watch for ticket 118 on the counter screen.' },
@@ -56,7 +58,7 @@ const PASS_STAGES = [
     body: 'Collect your plate when it is called and take it back to your seat. The bill was settled with the order, so there is nothing left to ask for at the end.',
     facts: [
       { key: 'You', value: 'Collect, eat, stay as long as you like.' },
-      { key: 'The room', value: 'No queue, no second payment.' },
+      { key: 'The room', value: 'Nothing left to settle at the end.' },
     ],
     image: '/images/menu/chicken-biryani.jpg',
     signal: 'Table 04 · served',
@@ -71,13 +73,18 @@ const GALLERY = [
   { crop: '3', title: 'The sweet end', body: 'A small finish, made in the same kitchen, on the same tray.' },
 ];
 
-const LIGHTS = [
-  { id: 'morning', label: 'Morning' },
-  { id: 'golden', label: 'Golden' },
-  { id: 'dusk', label: 'Dusk' },
-];
-
 const ENTRY_ROUTE = 'M92 566C226 566 268 480 400 480S568 524 682 456S836 366 904 356';
+
+// Where the plate sits at each stop of the service line, in percent of the track.
+// The curve below runs through these same four points, so the plate never drifts
+// off the line it is travelling on.
+const PASS_POINTS = [
+  { left: 50, top: 0 },
+  { left: 20, top: 33.333 },
+  { left: 80, top: 66.666 },
+  { left: 50, top: 100 },
+];
+const SERVICE_PATH = 'M50 0 C 8 12 8 24 20 33.333 C 66 46 96 52 80 66.666 C 64 82 54 92 50 100';
 
 function ProjectLandingPage() {
   const navigate = useNavigate();
@@ -86,29 +93,72 @@ function ProjectLandingPage() {
   const entryTimers = useRef([]);
   const passScrollRef = useRef(null);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingTable, setBookingTable] = useState('');
   const [stage, setStage] = useState(0);
-  const [light, setLight] = useState('golden');
-  const [freeTables, setFreeTables] = useState(null);
+  const [tables, setTables] = useState(null);
+  const [floorOffline, setFloorOffline] = useState(false);
   const [entry, setEntry] = useState(null);
+  const [doorOpening, setDoorOpening] = useState(false);
+  const { socket } = useSocket();
 
+  // The floor is live: read it once, then follow the socket and re-read whenever the tab
+  // comes back, so a guest never reads a count that is an hour old.
   useEffect(() => {
     let active = true;
-    tableApi
-      .getTables()
-      .then((response) => {
-        if (!active) return;
-        const list = Array.isArray(response?.data)
-          ? response.data
-          : (response?.data?.tables || response?.tables || []);
-        if (list.length) {
-          setFreeTables(list.filter((table) => table.status === 'available').length);
-        }
-      })
-      .catch(() => {});
+    const load = () => {
+      tableApi
+        .getTables()
+        .then((response) => {
+          if (!active) return;
+          const list = Array.isArray(response?.data)
+            ? response.data
+            : (response?.data?.tables || response?.tables || []);
+          setFloorOffline(false);
+          if (!list.length) return;
+          setTables(list.map((table) => ({
+            _id: table._id,
+            tableId: table.tableId,
+            status: table.status,
+          })));
+        })
+        .catch(() => {
+          if (active) setFloorOffline(true);
+        });
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+
+    load();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', load);
     return () => {
       active = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', load);
     };
   }, []);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onTableStatus = (table) => {
+      if (!table) return;
+      setTables((prev) => {
+        if (!prev) return prev;
+        const key = table._id || table.tableId;
+        const index = prev.findIndex((current) => (current._id || current.tableId) === key);
+        if (index === -1) {
+          return [...prev, { _id: table._id, tableId: table.tableId, status: table.status }];
+        }
+        const next = [...prev];
+        next[index] = { ...next[index], status: table.status };
+        return next;
+      });
+    };
+
+    socket.on('table:statusUpdate', onTableStatus);
+    return () => socket.off('table:statusUpdate', onTableStatus);
+  }, [socket]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -218,30 +268,68 @@ function ProjectLandingPage() {
       navigate('/cafe', { state: { fromLandingRide: true } });
       return;
     }
-    if (entry) return;
+    if (entry || doorOpening) return;
+
+    // The door leads the way in: it swings open first, and only then does the glass
+    // start to mist. The hand-over waits for the leaf to be most of the way open, so
+    // the room arrives through a door you just opened rather than over a still frame.
     const rect = windowRef.current.getBoundingClientRect();
-    setEntry({
-      phase: 'at-window',
-      style: {
-        '--et': `${Math.max(0, Math.round(rect.top))}px`,
-        '--er': `${Math.max(0, Math.round(window.innerWidth - rect.right))}px`,
-        '--eb': `${Math.max(0, Math.round(window.innerHeight - rect.bottom))}px`,
-        '--el': `${Math.max(0, Math.round(rect.left))}px`,
-        '--erad': `${Math.round(Math.min(rect.width * 0.3, 240))}px`,
-      },
-    });
+    setDoorOpening(true);
     entryTimers.current = [
-      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'expanded' } : current)), 60),
-      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'bloom' } : current)), 1060),
+      window.setTimeout(() => {
+        setEntry({
+          phase: 'at-window',
+          style: {
+            '--et': `${Math.max(0, Math.round(rect.top))}px`,
+            '--er': `${Math.max(0, Math.round(window.innerWidth - rect.right))}px`,
+            '--eb': `${Math.max(0, Math.round(window.innerHeight - rect.bottom))}px`,
+            '--el': `${Math.max(0, Math.round(rect.left))}px`,
+            '--erad': `${Math.round(Math.min(rect.width * 0.3, 240))}px`,
+          },
+        });
+      }, 700),
+      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'expanded' } : current)), 760),
+      window.setTimeout(() => setEntry((current) => (current ? { ...current, phase: 'bloom' } : current)), 1760),
       // Hand over while the mist is at its brightest, so the café opens out of the mist instead of a cut.
-      window.setTimeout(() => navigate('/cafe', { state: { fromLandingRide: true } }), 1500),
+      window.setTimeout(() => navigate('/cafe', { state: { fromLandingRide: true } }), 2200),
     ];
   };
 
+  const openBooking = (tableId = '') => {
+    setBookingTable(tableId);
+    setBookingOpen(true);
+  };
+
+  // The moment buttons move the page, not the state: the scroll position is the
+  // single source of truth for which stop the plate is standing at.
+  const goToStage = (index) => {
+    setStage(index);
+    const wrapper = passScrollRef.current;
+    if (!wrapper) return;
+    const rect = wrapper.getBoundingClientRect();
+    const span = rect.height - window.innerHeight;
+    const pinned = window.matchMedia('(min-width: 861px)').matches
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!pinned || span < 120) return;
+    // Inverse of the progress mapping in paint(), so a click lands on the stop.
+    const target = (index / (PASS_STAGES.length - 1)) * 0.88 + 0.06;
+    window.scrollTo({ top: window.scrollY + rect.top + target * span, behavior: 'smooth' });
+  };
+
   const active = PASS_STAGES[stage];
-  const tagCopy = freeTables === null
-    ? 'Table-side ordering, no queue at the counter'
-    : `${freeTables} of 6 tables free right now`;
+  // Same counting rule as the café room and the console (utils/tableAvailability).
+  const floor = tables ? summariseTables(tables) : null;
+  // The seats under the window read the same live floor as the café and the console,
+  // so picking one here opens the booking form already set to that table.
+  const seats = (tables || Array.from({ length: 6 }, () => null)).map((table, index) => ({
+    key: table?.tableId || `seat-${index + 1}`,
+    tableId: table?.tableId || '',
+    number: String(index + 1).padStart(2, '0'),
+    status: table?.status || 'unknown',
+  }));
+  const floorCopy = !floor
+    ? 'Table availability updates live against the floor'
+    : `${floor.free} free · ${floor.taken} taken right now`;
 
   return (
     <>
@@ -258,16 +346,16 @@ function ProjectLandingPage() {
           <a href="#the-pass">The pass</a>
           <Link to="/admin/login">Staff sign in</Link>
         </nav>
-        <button className="lwc-head-action" type="button" onClick={() => setBookingOpen(true)}>
+        <button className="lwc-head-action" type="button" onClick={() => openBooking()}>
           Book a table
           <ArrowRight size={15} />
         </button>
-        <button className="lwc-head-compact" type="button" onClick={() => setBookingOpen(true)} aria-label="Book a table">
+        <button className="lwc-head-compact" type="button" onClick={() => openBooking()} aria-label="Book a table">
           <CalendarDays size={17} />
         </button>
       </header>
 
-      <section className="lwc-hero" id="lwc-main" data-light={light} aria-labelledby="lwc-title">
+      <section className="lwc-hero" id="lwc-main" data-light="golden" aria-labelledby="lwc-title">
         <span className="lwc-room-tint" aria-hidden="true" />
 
         <div className="lwc-hero-copy">
@@ -278,11 +366,11 @@ function ProjectLandingPage() {
             <span style={{ '--i': 2 }}>and no hurry.</span>
           </h1>
           <p className="lwc-hero-lede">
-            Order from the card on your table and follow your plate to the kitchen pass. Six tables, one kitchen,
-            and a garden to sit in while you wait.
+            Six tables, one kitchen, and a garden to sit in while your plate is cooked. Pick a free table below
+            and we will hold it for you.
           </p>
           <div className="lwc-hero-actions">
-            <button className="lwc-btn" type="button" onClick={() => setBookingOpen(true)}>
+            <button className="lwc-btn" type="button" onClick={() => openBooking()}>
               Book a table
               <ArrowRight size={17} />
             </button>
@@ -290,89 +378,86 @@ function ProjectLandingPage() {
         </div>
 
         <div className="lwc-window-wrap">
-        <div className="lwc-window" ref={windowRef}>
-          <div className="lwc-glass" role="img" aria-label="The café's arched window: garden light, a plate of food on the sill, and grasses moving in the breeze.">
-            <span className="lwc-sky lwc-sky-morning" aria-hidden="true" />
+        <div className={'lwc-window' + (doorOpening ? ' is-opening' : '')} ref={windowRef}>
+          <div className="lwc-glass" role="img" aria-label="The café's arched window: a green café door under a striped awning, lamplight on the wall, and a plate of food on the sill.">
             <span className="lwc-sky lwc-sky-golden" aria-hidden="true" />
-            <span className="lwc-sky lwc-sky-dusk" aria-hidden="true" />
             <div className="lwc-sun" />
             <div className="lwc-glass-light" />
-            <div className="lwc-canopy" data-parallax="0.085" aria-hidden="true">
-              <svg viewBox="0 0 400 150" preserveAspectRatio="xMidYMin slice">
-                <g fill="#527750" opacity="0.62">
-                  <ellipse cx="26" cy="18" rx="92" ry="56" />
-                  <ellipse cx="104" cy="-6" rx="68" ry="46" />
-                  <ellipse cx="374" cy="14" rx="102" ry="52" />
-                  <ellipse cx="312" cy="-10" rx="66" ry="44" />
-                  <ellipse cx="212" cy="-24" rx="102" ry="42" />
+            {/* The way in: a painted café door behind the glass. It stands ajar on hover,
+                the way a door does when someone is already expecting you. */}
+            <div className="lwc-door-scene" data-parallax="0.055" aria-hidden="true">
+              <svg viewBox="0 0 400 320" preserveAspectRatio="xMidYMax slice">
+                <defs>
+                  <linearGradient id="lwc-door-wall" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor="#e2d7c0" />
+                    <stop offset="0.62" stopColor="#cbb99a" />
+                    <stop offset="1" stopColor="#ab9776" />
+                  </linearGradient>
+                  <linearGradient id="lwc-door-glow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor="#ffeccb" />
+                    <stop offset="0.55" stopColor="#ffcf93" />
+                    <stop offset="1" stopColor="#e99b58" />
+                  </linearGradient>
+                  <linearGradient id="lwc-door-glass" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#e6efe6" stopOpacity="0.9" />
+                    <stop offset="0.58" stopColor="#b9cfc0" stopOpacity="0.6" />
+                    <stop offset="1" stopColor="#7f9f8b" stopOpacity="0.5" />
+                  </linearGradient>
+                </defs>
+
+                <rect width="400" height="320" fill="url(#lwc-door-wall)" />
+
+                {/* Faint coursing so the wall reads as a wall, never as a pattern. */}
+                <g stroke="#9d8967" strokeWidth="1" opacity="0.16">
+                  <path d="M0 34h400M0 68h400M0 102h400M0 136h400M0 170h400M0 204h400M0 238h400M0 272h400M0 306h400" />
+                  <path d="M60 0v34M180 0v34M300 0v34M120 34v34M240 34v34M360 34v34M60 68v34M180 68v34M300 68v34M120 102v34M240 102v34M360 102v34M60 136v34M180 136v34M300 136v34M120 170v34M240 170v34M360 170v34M60 204v34M180 204v34M300 204v34M120 238v34M240 238v34M360 238v34M60 272v34M180 272v34M300 272v34M120 306v14M240 306v14M360 306v14" />
                 </g>
-                <g fill="#2f4c36" opacity="0.5">
-                  <ellipse cx="-2" cy="58" rx="68" ry="40" />
-                  <ellipse cx="398" cy="64" rx="76" ry="38" />
-                  <ellipse cx="188" cy="-12" rx="54" ry="30" />
+
+                {/* Awning over the door: forest and cream stripes. */}
+                <g className="lwc-door-awning">
+                  <path d="M108 44h184l26 44H82z" fill="#2f4a3a" />
+                  <path d="M126 44h18l8 44h-18zM162 44h18l8 44h-18zM198 44h18l8 44h-18zM234 44h18l8 44h-18zM270 44h9l6 44h-9z" fill="#f3ebdd" opacity="0.86" />
+                  <path d="M82 88h236l-12 16H94z" fill="#24382c" />
+                </g>
+
+                {/* Warm light behind the door, the only warm thing on the wall. */}
+                <path className="lwc-door-spill" d="M140 320V186a60 60 0 0 1 120 0v134z" fill="url(#lwc-door-glow)" />
+
+                {/* The leaf itself, hinged on the left so it swings inward. */}
+                <g className="lwc-door-leaf">
+                  <path d="M140 320V186a60 60 0 0 1 120 0v134z" fill="#2f4a3a" stroke="#203327" strokeWidth="3" />
+                  <path d="M154 320V190a46 46 0 0 1 92 0v130z" fill="url(#lwc-door-glass)" />
+                  <rect x="154" y="232" width="92" height="4" fill="#f3ebdd" opacity="0.62" />
+                  <rect x="154" y="286" width="92" height="3" fill="#24382c" opacity="0.5" />
+                  <circle cx="236" cy="262" r="4.2" fill="#dcb87a" stroke="#9d7a3c" strokeWidth="1.4" />
+                  <rect x="230" y="266" width="4" height="12" rx="2" fill="#c9a468" />
+                </g>
+
+                {/* Door frame, drawn over the leaf so the edge reads crisply. */}
+                <path d="M137 320V186a63 63 0 0 1 126 0v134" fill="none" stroke="#24382c" strokeWidth="5" strokeLinecap="round" />
+                <rect x="120" y="312" width="160" height="8" rx="2" fill="#6a5130" />
+
+                {/* Two wall lanterns either side of the door. */}
+                <g fill="#24382c">
+                  <rect x="104" y="186" width="18" height="24" rx="3" />
+                  <rect x="278" y="186" width="18" height="24" rx="3" />
+                </g>
+                <g fill="#ffd79a">
+                  <rect x="107" y="190" width="12" height="16" rx="2" />
+                  <rect x="281" y="190" width="12" height="16" rx="2" />
+                </g>
+                <g stroke="#24382c" strokeWidth="2" strokeLinecap="round">
+                  <path d="M113 186v-8M287 186v-8" />
+                </g>
+
+                {/* The open sign, hung from the awning on two thin chains. */}
+                <g className="lwc-door-sign">
+                  <path d="M176 104v8M224 104v8" stroke="#24382c" strokeWidth="1.6" />
+                  <rect x="166" y="112" width="68" height="26" rx="4" fill="#f3ebdd" stroke="#2f4a3a" strokeWidth="2" />
+                  <text x="200" y="130" textAnchor="middle" fill="#2f4a3a" fontSize="13" fontWeight="700" letterSpacing="1.6">OPEN</text>
                 </g>
               </svg>
             </div>
-            <svg className="lwc-garden" data-parallax="0.05" viewBox="0 0 400 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-              <defs>
-                <linearGradient id="lwc-garden-haze" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#93a47d" stopOpacity="0" />
-                  <stop offset="0.6" stopColor="#6d8659" stopOpacity="0.32" />
-                  <stop offset="1" stopColor="#4f6b45" stopOpacity="0.62" />
-                </linearGradient>
-              </defs>
-              <g stroke="#7e9470" strokeWidth="2.6" strokeLinecap="round" fill="none" opacity="0.34">
-                <path d="M36 200c-2-48 4-78 12-96" />
-                <path d="M104 200c-4-44 2-72 10-92" />
-                <path d="M172 200c-3-52 3-84 11-104" />
-                <path d="M238 200c-3-46 3-76 11-96" />
-                <path d="M306 200c-4-50 2-80 10-100" />
-                <path d="M370 200c-3-42 3-70 11-90" />
-              </g>
-              <rect y="104" width="400" height="96" fill="url(#lwc-garden-haze)" />
-              <g stroke="#3f5c3e" strokeWidth="1.6" strokeLinecap="round" fill="none" opacity="0.7">
-                <path d="M8 200c-3-52 3-88 10-112" />
-                <path d="M22 200c-2-40 2-68 8-86" />
-                <path d="M37 200c-3-60 3-98 11-122" />
-                <path d="M52 200c-2-34 2-58 7-74" />
-                <path d="M67 200c-3-46 3-78 10-98" />
-                <path d="M82 200c-2-30 2-52 7-66" />
-                <path d="M98 200c-3-56 3-92 11-114" />
-                <path d="M113 200c-2-38 2-64 8-82" />
-                <path d="M128 200c-3-48 3-80 10-100" />
-                <path d="M144 200c-2-32 2-54 7-70" />
-                <path d="M159 200c-3-58 3-96 11-118" />
-                <path d="M175 200c-2-42 2-70 8-88" />
-                <path d="M190 200c-3-36 3-62 10-78" />
-                <path d="M206 200c-2-50 2-84 7-104" />
-                <path d="M221 200c-3-30 3-52 11-66" />
-                <path d="M237 200c-2-44 2-74 8-94" />
-                <path d="M252 200c-3-54 3-90 10-110" />
-                <path d="M268 200c-2-34 2-58 7-74" />
-                <path d="M283 200c-3-48 3-80 11-100" />
-                <path d="M299 200c-2-38 2-66 8-84" />
-                <path d="M314 200c-3-60 3-98 10-120" />
-                <path d="M330 200c-2-32 2-54 7-68" />
-                <path d="M345 200c-3-44 3-74 11-92" />
-                <path d="M361 200c-2-36 2-62 8-78" />
-                <path d="M376 200c-3-52 3-86 10-106" />
-                <path d="M391 200c-2-40 2-68 8-86" />
-              </g>
-              <g fill="#3f5c3e" opacity="0.72">
-                <ellipse cx="18" cy="88" rx="4" ry="8" transform="rotate(-12 18 88)" />
-                <ellipse cx="48" cy="78" rx="4" ry="8" transform="rotate(9 48 78)" />
-                <ellipse cx="109" cy="118" rx="3.6" ry="7" transform="rotate(-9 109 118)" />
-                <ellipse cx="170" cy="84" rx="4" ry="8" transform="rotate(13 170 84)" />
-                <ellipse cx="245" cy="106" rx="4" ry="8" transform="rotate(-14 245 106)" />
-                <ellipse cx="324" cy="80" rx="4" ry="8" transform="rotate(10 324 80)" />
-                <ellipse cx="384" cy="114" rx="3.6" ry="7" transform="rotate(-11 384 114)" />
-              </g>
-              <g stroke="#3a563a" strokeWidth="1.6" strokeLinecap="round" fill="none" opacity="0.55">
-                <path d="M206 46q7-7 14 0M220 46q7-7 14 0" />
-                <path d="M250 30q5-5 10 0M260 30q5-5 10 0" />
-                <path d="M168 26q5-5 10 0M178 26q5-5 10 0" />
-              </g>
-            </svg>
             <div className="lwc-glass-sheen" />
             <div className="lwc-vignette" />
           </div>
@@ -382,31 +467,48 @@ function ProjectLandingPage() {
           </div>
           <div className="lwc-steam" aria-hidden="true"><i /><i /><i /></div>
           <div className="lwc-mullions" aria-hidden="true"><i /><i /></div>
-          <button className="lwc-window-enter" type="button" onClick={stepInside} disabled={Boolean(entry)}>
+          <button className="lwc-window-enter" type="button" onClick={stepInside} disabled={Boolean(entry) || doorOpening}>
             <span className="lwc-door-lamp" aria-hidden="true" />
             Step inside the café
             <ArrowDown size={16} />
           </button>
-          <p className="lwc-window-tag"><i aria-hidden="true" />{tagCopy}</p>
         </div>
         </div>
 
         <div className="lwc-hero-foot">
-          <span>Reservations held live against six tables</span>
-          <div className="lwc-light" role="group" aria-label="Change the light in the window">
-            {LIGHTS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className="lwc-light-btn"
-                aria-pressed={light === option.id}
-                onClick={() => setLight(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
+          <span className="lwc-floor-line" aria-live="polite"><i aria-hidden="true" />{floorCopy}</span>
+          <div className="lwc-seats" role="group" aria-label="Pick a seat to book">
+            <span className="lwc-seats-label">
+              {tables ? 'Pick a seat' : floorOffline ? 'Floor offline' : 'Checking the floor'}
+            </span>
+            {seats.map((seat) => {
+              const stateLabel = seat.status === 'available'
+                ? 'free'
+                : seat.status === 'unknown' ? 'not loaded yet' : seat.status;
+              return (
+                <button
+                  key={seat.key}
+                  type="button"
+                  className="lwc-seat"
+                  data-state={seat.status}
+                  disabled={seat.status !== 'available'}
+                  aria-label={
+                    seat.status === 'available'
+                      ? `Table ${seat.number} is free — book it`
+                      : `Table ${seat.number} is ${stateLabel}`
+                  }
+                  title={`Table ${seat.number} · ${stateLabel}`}
+                  onClick={() => openBooking(seat.tableId)}
+                >
+                  {seat.number}
+                </button>
+              );
+            })}
+            <span className="lwc-seat-legend" aria-hidden="true">
+              <i data-state="available" />free<i data-state="occupied" />taken
+            </span>
           </div>
-          <span>Scroll to follow a plate <ArrowDown size={13} /></span>
+          <span className="lwc-hero-scroll">Scroll to follow a plate <ArrowDown size={13} /></span>
         </div>
       </section>
 
@@ -415,8 +517,8 @@ function ProjectLandingPage() {
         <aside>
           <b>How it works</b>
           <p>
-            Every table has its own card. Scanning it opens the menu for that seat, so food arrives where you are
-            sitting. Book ahead and the table is held for thirty minutes past your time.
+            Choose a table and a time, and we will hold it for thirty minutes past your booking. The kitchen
+            keeps the same hours as the room.
           </p>
         </aside>
       </section>
@@ -425,54 +527,54 @@ function ProjectLandingPage() {
       <section className="lwc-pass" id="the-pass" data-stage={stage} aria-labelledby="lwc-pass-title">
         <div className="lwc-pass-head">
           <h2 id="lwc-pass-title">Follow one plate.</h2>
-          <p>Four moments between your chair and the pass. Most tickets go from paid to ready in under ten minutes — drag the rail, or use the arrow keys, to follow one plate through.</p>
+          <p>Four moments between your chair and the pass. Most tickets go from paid to ready in under ten minutes — scroll, or pick a moment, to follow one plate through.</p>
         </div>
 
-        <div className="lwc-rail" style={{ '--p': stage / (PASS_STAGES.length - 1) }}>
-          <div className="lwc-rail-track" />
-          <div className="lwc-rail-progress" />
-          <div className="lwc-rail-marks" aria-hidden="true">
-            {PASS_STAGES.map((step, index) => (
-              <i key={step.label} style={{ left: `${(index / (PASS_STAGES.length - 1)) * 100}%` }} />
-            ))}
-          </div>
-          <div className="lwc-plate" aria-hidden="true">
-            <i style={{ backgroundImage: `url(${active.image})` }} />
-          </div>
-          <input
-            className="lwc-scrub"
-            type="range"
-            min="0"
-            max={PASS_STAGES.length - 1}
-            step="1"
-            value={stage}
-            onChange={(event) => setStage(Number(event.target.value))}
-            aria-label="Move the plate through service"
-            aria-valuetext={active.label}
-          />
-        </div>
-
-        <div className="lwc-stops">
+        <div className="lwc-stops" role="group" aria-label="Jump to a moment in the service line">
           {PASS_STAGES.map((step, index) => (
             <button
               key={step.label}
               type="button"
               className="lwc-stop"
-              data-edge={index === 0 ? 'start' : index === PASS_STAGES.length - 1 ? 'end' : 'middle'}
-              data-short={step.short}
               aria-current={index === stage ? 'true' : 'false'}
-              onClick={() => setStage(index)}
-              style={{
-                left: `${(index / (PASS_STAGES.length - 1)) * 100}%`,
-                transform: index === 0 ? 'none' : index === PASS_STAGES.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
-              }}
+              onClick={() => goToStage(index)}
             >
-              {step.label}
+              <b aria-hidden="true">{String(index + 1).padStart(2, '0')}</b>
+              <span>{step.label}</span>
             </button>
           ))}
         </div>
 
         <div className="lwc-pass-body">
+          {/* The service line: one plate on a quiet curve through the four stops. It is
+              decoration, so it is hidden from assistive tech — the stops and the live
+              copy above carry the same information. */}
+          <div className="lwc-service-track" aria-hidden="true">
+            <div className="lwc-service-inner">
+              <svg className="lwc-service-path" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path className="lwc-service-line" d={SERVICE_PATH} pathLength="100" />
+                <path
+                  className="lwc-service-line is-done"
+                  d={SERVICE_PATH}
+                  pathLength="100"
+                  style={{ strokeDashoffset: 100 - (stage / (PASS_STAGES.length - 1)) * 100 }}
+                />
+              </svg>
+              {PASS_POINTS.map((point, index) => (
+                <i
+                  key={point.top}
+                  className={'lwc-service-node' + (index <= stage ? ' is-done' : '')}
+                  style={{ left: `${point.left}%`, top: `${point.top}%` }}
+                />
+              ))}
+              <div
+                className="lwc-service-plate"
+                style={{ left: `${PASS_POINTS[stage].left}%`, top: `${PASS_POINTS[stage].top}%` }}
+              >
+                <i style={{ backgroundImage: `url(${active.image})` }} />
+              </div>
+            </div>
+          </div>
           <div className="lwc-pass-copy" aria-live="polite">
             <span className="lwc-stage-time">{active.time}</span>
             <h3>{active.title}</h3>
@@ -525,7 +627,7 @@ function ProjectLandingPage() {
               Choose a time and we will hold an available table, up to ninety days ahead. The kitchen keeps the
               same hours as the room.
             </p>
-            <button className="lwc-btn" type="button" onClick={() => setBookingOpen(true)}>
+            <button className="lwc-btn" type="button" onClick={() => openBooking()}>
               Book a table
               <ArrowRight size={17} />
             </button>
@@ -536,7 +638,7 @@ function ProjectLandingPage() {
           <nav aria-label="Footer">
             <a href="#the-room">The room</a>
             <a href="#the-pass">The pass</a>
-            <button type="button" className="lwc-foot-link" onClick={stepInside} disabled={Boolean(entry)}>
+            <button type="button" className="lwc-foot-link" onClick={stepInside} disabled={Boolean(entry) || doorOpening}>
               Café floor
             </button>
             <Link to="/admin/login">Staff sign in</Link>
@@ -545,7 +647,15 @@ function ProjectLandingPage() {
         </div>
       </section>
 
-      {bookingOpen && <BookingModal onClose={() => setBookingOpen(false)} />}
+      {bookingOpen && (
+        <BookingModal
+          initialTableId={bookingTable}
+          onClose={() => {
+            setBookingOpen(false);
+            setBookingTable('');
+          }}
+        />
+      )}
     </main>
 
     {entry && (

@@ -219,18 +219,6 @@
   background: radial-gradient(92% 74% at 78% 50%, rgba(255, 122, 92, 0.16), rgba(255, 122, 92, 0) 64%);
 }
 
-.lwc-hero[data-light='morning'] .lwc-room-tint {
-  opacity: 1;
-  background: radial-gradient(92% 74% at 74% 38%, rgba(186, 212, 186, 0.16), rgba(186, 212, 186, 0) 64%);
-}
-
-.lwc-hero[data-light='dusk'] .lwc-room-tint {
-  opacity: 1;
-  background:
-    radial-gradient(96% 78% at 82% 60%, rgba(206, 130, 88, 0.24), rgba(206, 130, 88, 0) 66%),
-    linear-gradient(0deg, rgba(5, 14, 11, 0.5), rgba(5, 14, 11, 0) 62%);
-}
-
 .lwc-hero-copy {
   position: relative;
   z-index: 2;
@@ -329,16 +317,18 @@
   min-height: 50px;
   padding: 0 22px;
   overflow: hidden;
-  color: #f2ecdf;
+  color: #1b2c22;
   background: linear-gradient(
     124deg,
-    rgba(15, 36, 28, 0.93) 0%,
-    rgba(26, 51, 37, 0.88) 52%,
-    rgba(15, 36, 28, 0.93) 100%
+    #ff9a78 0%,
+    #ff7a5c 52%,
+    #f26a44 100%
   );
-  border: 1px solid rgba(222, 188, 128, 0.62);
+  border: 1px solid rgba(255, 178, 148, 0.9);
   border-radius: 999px;
-  box-shadow: 0 20px 34px -22px rgba(16, 28, 21, 0.95);
+  box-shadow:
+    0 20px 34px -22px rgba(84, 28, 14, 0.85),
+    0 0 28px -8px rgba(255, 122, 92, 0.55);
   cursor: pointer;
   font-family: inherit;
   font-size: 14px;
@@ -376,8 +366,14 @@
 }
 
 .lwc-window-enter:hover {
-  color: #f3eee2;
-  border-color: rgba(246, 224, 178, 0.95);
+  color: #16241c;
+  border-color: #fff0e4;
+  background: linear-gradient(
+    124deg,
+    #ffab8c 0%,
+    #ff8b6f 52%,
+    #ff7448 100%
+  );
 }
 
 .lwc-window-enter:hover svg {
@@ -386,7 +382,7 @@
 }
 
 .lwc-window-enter:focus-visible {
-  outline: 2px solid rgba(246, 224, 178, 0.9);
+  outline: 2px solid #ffd8c8;
   outline-offset: 3px;
 }
 
@@ -406,8 +402,8 @@
   height: 6px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: #efe7d7;
-  box-shadow: 0 0 10px 2px rgba(240, 216, 166, 0.62);
+  background: #3a241a;
+  box-shadow: 0 0 10px 2px rgba(255, 244, 226, 0.7);
   animation: lwc-door-lamp 2.4s ease-in-out infinite;
 }
 
@@ -428,16 +424,16 @@
   0%,
   100% {
     box-shadow:
-      0 20px 34px -22px rgba(16, 28, 21, 0.95),
-      0 0 0 0 rgba(255, 122, 92, 0),
-      inset 0 0 0 1px rgba(255, 122, 92, 0.18);
+      0 20px 34px -22px rgba(84, 28, 14, 0.85),
+      0 0 0 0 rgba(255, 240, 228, 0),
+      inset 0 0 0 1px rgba(255, 240, 228, 0.22);
   }
 
   50% {
     box-shadow:
-      0 22px 36px -22px rgba(16, 28, 21, 0.95),
-      0 0 30px 3px rgba(255, 122, 92, 0.34),
-      inset 0 0 0 1px rgba(240, 216, 166, 0.42);
+      0 22px 36px -22px rgba(84, 28, 14, 0.85),
+      0 0 34px 4px rgba(255, 216, 190, 0.48),
+      inset 0 0 0 1px rgba(255, 240, 228, 0.52);
   }
 }
 
@@ -486,6 +482,7 @@
 
 .lwc-hero-foot {
   display: flex;
+  flex-wrap: wrap;
   grid-column: 1 / -1;
   align-items: center;
   gap: clamp(14px, 3vw, 40px);
@@ -511,7 +508,7 @@
   gap: 8px;
 }
 
-.lwc-hero-foot .lwc-light {
+.lwc-hero-foot .lwc-seats {
   margin-left: auto;
 }
 
@@ -573,47 +570,8 @@
   background: linear-gradient(178deg, #efe8d8 0%, #ece3d1 38%, #e9dec8 66%, #77a087 100%);
 }
 
-.lwc-sky-morning {
-  background: linear-gradient(178deg, #f7fbf2 0%, #f4f0e8 36%, #efe9de 64%, #92b39f 100%);
-}
-
-.lwc-sky-dusk {
-  background: linear-gradient(178deg, #ede4d2 0%, #eab884 34%, #f0836b 62%, #6d5450 100%);
-}
-
-.lwc-hero[data-light='golden'] .lwc-sky-golden,
-.lwc-hero[data-light='morning'] .lwc-sky-morning,
-.lwc-hero[data-light='dusk'] .lwc-sky-dusk {
+.lwc-hero[data-light='golden'] .lwc-sky-golden {
   opacity: 1;
-}
-
-.lwc-hero[data-light='morning'] .lwc-sun {
-  top: 8%;
-  right: 26%;
-  background: radial-gradient(circle, rgba(255, 255, 246, 0.92) 0%, rgba(238, 248, 236, 0.4) 44%, rgba(238, 248, 236, 0) 74%);
-}
-
-.lwc-hero[data-light='dusk'] .lwc-sun {
-  top: 32%;
-  right: 4%;
-  width: clamp(120px, 18vw, 210px);
-  background: radial-gradient(circle, rgba(255, 226, 168, 0.95) 0%, rgba(255, 176, 112, 0.46) 44%, rgba(255, 176, 112, 0) 76%);
-}
-
-.lwc-hero[data-light='morning'] .lwc-garden {
-  filter: brightness(1.08) saturate(0.95);
-}
-
-.lwc-hero[data-light='dusk'] .lwc-garden {
-  filter: brightness(0.66) saturate(0.8) hue-rotate(-10deg);
-}
-
-.lwc-hero[data-light='dusk'] .lwc-sill {
-  filter: brightness(0.82);
-}
-
-.lwc-hero[data-light='dusk'] .lwc-vignette {
-  box-shadow: inset 0 0 120px rgba(40, 22, 12, 0.55);
 }
 
 .lwc-sun {
@@ -627,23 +585,6 @@
   transition: transform 0.6s cubic-bezier(0.22, 0.75, 0.25, 1);
 }
 
-.lwc-canopy {
-  position: absolute;
-  right: -6%;
-  top: -6%;
-  left: -6%;
-  height: 40%;
-  transform: translate3d(calc(var(--px, 0) * -14px), var(--shift, 0px), 0);
-  filter: blur(3px);
-  opacity: 0.9;
-  will-change: transform;
-}
-
-.lwc-canopy svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
 
 .lwc-vignette {
   position: absolute;
@@ -673,21 +614,107 @@
   mix-blend-mode: screen;
 }
 
-.lwc-garden {
+/* The view behind the glass is the café's own door, not a garden: the window looks
+   into the place you are about to step into. Pointer parallax stays on the layer, so
+   the door answers the cursor the same way the sill and the light always have. */
+.lwc-door-scene {
   position: absolute;
   right: -4%;
   bottom: 0;
   left: -4%;
-  height: 74%;
+  height: 88%;
   transform: translate3d(calc(var(--px, 0) * 11px), var(--shift, 0px), 0);
   transition: filter 0.6s ease;
   will-change: transform;
+  perspective: 640px;
 }
 
-.lwc-garden svg {
+.lwc-door-scene svg {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Hinged on the left edge, the leaf swings inward and lets the warm room through. */
+.lwc-door-leaf {
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: rotateY(0deg);
+  transition: transform 0.9s cubic-bezier(0.22, 0.75, 0.25, 1), filter 0.9s ease;
+}
+
+.lwc-window:hover .lwc-door-leaf,
+.lwc-window:focus-within .lwc-door-leaf {
+  transform: rotateY(-24deg);
+  filter: brightness(1.05);
+}
+
+.lwc-door-spill {
+  opacity: 0.28;
+  transition: opacity 0.8s ease;
+}
+
+.lwc-window:hover .lwc-door-spill,
+.lwc-window:focus-within .lwc-door-spill {
+  opacity: 0.9;
+}
+
+/* The way in, in order: the leaf swings wide first, the room behind it floods warm,
+   and only then does the glass mist. Declared after the hover rules so the click
+   sequence wins over the pointer. */
+.lwc-window.is-opening .lwc-door-leaf {
+  transform: rotateY(-68deg);
+  transition: transform 0.62s cubic-bezier(0.32, 0.72, 0.22, 1), filter 0.6s ease;
+  filter: brightness(1.08);
+}
+
+.lwc-window.is-opening .lwc-door-spill {
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+.lwc-window.is-opening .lwc-door-sign {
+  animation: none;
+  transform: rotate(7deg);
+  transition: transform 0.5s ease;
+}
+
+.lwc-window.is-opening .lwc-door-awning {
+  transform: translateY(-3px) scaleY(1.03);
+}
+
+.lwc-door-sign {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: lwc-door-sway 7s ease-in-out infinite;
+}
+
+.lwc-door-awning {
+  transform-box: fill-box;
+  transform-origin: center top;
+  transition: transform 0.7s cubic-bezier(0.22, 0.75, 0.25, 1);
+}
+
+.lwc-window:hover .lwc-door-awning {
+  transform: translateY(-2px) scaleY(1.02);
+}
+
+@keyframes lwc-door-sway {
+  0%,
+  100% {
+    transform: rotate(-1.1deg);
+  }
+
+  50% {
+    transform: rotate(1.1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lwc-page .lwc-door-leaf,
+  .lwc-page .lwc-door-awning {
+    transform: none !important;
+  }
 }
 
 .lwc-sill {
@@ -803,41 +830,6 @@
   width: 100%;
 }
 
-.lwc-window-tag {
-  position: absolute;
-  z-index: 4;
-  bottom: 18px;
-  left: 18px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  max-width: calc(100% - 36px);
-  margin: 0;
-  padding: 9px 14px;
-  color: #f1eadc;
-  background: rgba(27, 44, 34, 0.9);
-  border: 1px solid rgba(255, 122, 92, 0.42);
-  border-radius: 2px;
-  font-size: 11.5px;
-  line-height: 1.3;
-  backdrop-filter: blur(8px);
-}
-
-.lwc-window-tag i {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  background: #85ba99;
-  border-radius: 50%;
-  box-shadow: 0 0 0 4px rgba(157, 191, 134, 0.18);
-  animation: lwc-blink 3.4s ease-in-out infinite;
-}
-
-@keyframes lwc-blink {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
 /* ---------- Statement ---------- */
 
 .lwc-intro {
@@ -935,126 +927,132 @@
   line-height: 1.62;
 }
 
-.lwc-rail {
-  position: relative;
-  height: 76px;
-  margin: 0 27px;
-}
-
-.lwc-rail-track {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 1px;
-  background: var(--lwc-line);
-}
-
-.lwc-rail-progress {
-  position: absolute;
-  top: calc(50% - 1px);
-  left: 0;
-  width: calc(var(--p, 0) * 100%);
-  height: 2px;
-  background: var(--lwc-brass-deep);
-  transition: width 0.62s cubic-bezier(0.22, 0.8, 0.24, 1);
-}
-
-.lwc-rail-marks {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 1px;
-}
-
-.lwc-rail-marks i {
-  position: absolute;
-  top: -4px;
-  width: 1px;
-  height: 9px;
-  background: #b9c1b3;
-  transform: translateX(-50%);
-}
-
-.lwc-plate {
-  position: absolute;
-  top: 50%;
-  left: calc(var(--p, 0) * 100%);
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  margin: -29px 0 0 -29px;
-  background: radial-gradient(circle at 50% 42%, #f4eee3 0 62%, #f3ede1 63% 100%);
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px #e8deca, 0 12px 22px rgba(18, 36, 29, 0.16);
-  transition: left 0.62s cubic-bezier(0.22, 0.8, 0.24, 1);
-  pointer-events: none;
-}
-
-.lwc-plate i {
-  width: 38px;
-  height: 38px;
-  background-size: cover;
-  background-position: center;
-  border-radius: 50%;
-  transition: background-image 0.3s ease;
-}
-
-.lwc-scrub {
-  position: absolute;
-  inset: 0 -14px;
-  z-index: 3;
-  width: calc(100% + 28px);
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  opacity: 0;
-  cursor: grab;
-  appearance: none;
-  background: transparent;
-}
-
-.lwc-scrub:active {
-  cursor: grabbing;
-}
-
+/* The moments sit in a quiet row: four buttons that move the page, never a second
+   control that can disagree with the scroll position. */
 .lwc-stops {
-  position: relative;
-  height: 26px;
-  margin: 6px 27px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: clamp(16px, 3vh, 26px);
 }
 
 .lwc-stop {
-  position: absolute;
-  top: 0;
-  padding: 4px 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 7px 11px;
   color: var(--lwc-muted);
-  background: none;
-  border: 0;
+  background: rgba(247, 242, 226, 0.55);
+  border: 1px solid var(--lwc-line);
+  border-radius: 2px;
   cursor: pointer;
   font-family: var(--lwc-mono);
   font-size: 10.5px;
   letter-spacing: 0.03em;
   white-space: nowrap;
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
-.lwc-stop[data-edge='start'] { text-align: left; }
-.lwc-stop[data-edge='end'] { text-align: right; }
+.lwc-stop b {
+  color: #a8997f;
+  font-size: 9px;
+  font-weight: 500;
+}
 
-.lwc-stop:hover,
-.lwc-stop[aria-current='true'] {
+.lwc-stop:hover {
   color: var(--lwc-ink);
+  border-color: #b9c1b3;
+}
+
+.lwc-stop[aria-current='true'] {
+  color: var(--lwc-cream);
+  background: var(--lwc-ink);
+  border-color: var(--lwc-ink);
+}
+
+.lwc-stop[aria-current='true'] b {
+  color: var(--lwc-brass);
+}
+
+/* The service line: one plate walking a drawn curve from the chair, through the
+   kitchen and the pass, and back again. Page scroll is the only thing driving it. */
+.lwc-service-track {
+  position: relative;
+  min-height: clamp(290px, 47vh, 460px);
+}
+
+.lwc-service-inner {
+  position: absolute;
+  inset: 26px 0;
+}
+
+.lwc-service-path {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.lwc-service-line {
+  fill: none;
+  stroke: #ccd3c7;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.lwc-service-line.is-done {
+  stroke: var(--lwc-brass-deep);
+  stroke-width: 2;
+  stroke-dasharray: 100;
+  transition: stroke-dashoffset 0.55s cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+.lwc-service-node {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: var(--lwc-paper);
+  border: 1px solid #c3cbbc;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.lwc-service-node.is-done {
+  background: var(--lwc-brass-deep);
+  border-color: var(--lwc-brass-deep);
+}
+
+.lwc-service-plate {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  background: radial-gradient(circle at 50% 42%, #f8f3e8 0 62%, #f3ede1 63% 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #e8deca, 0 12px 22px rgba(18, 36, 29, 0.16);
+  transform: translate(-50%, -50%);
+  transition: top 0.55s cubic-bezier(0.22, 0.8, 0.24, 1), left 0.55s cubic-bezier(0.22, 0.8, 0.24, 1);
+  pointer-events: none;
+}
+
+.lwc-service-plate i {
+  width: 38px;
+  height: 38px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 50%;
 }
 
 .lwc-pass-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
-  gap: clamp(24px, 5vw, 72px);
-  margin-top: clamp(26px, 4vh, 44px);
-  padding-top: clamp(24px, 4vh, 40px);
+  grid-template-columns: 78px minmax(0, 1.02fr) minmax(0, 0.92fr);
+  gap: clamp(18px, 3.4vw, 52px);
+  margin-top: clamp(18px, 3vh, 32px);
+  padding-top: clamp(20px, 3vh, 34px);
   border-top: 1px solid var(--lwc-line);
 }
 
@@ -1442,6 +1440,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* The service line is a desktop flourish; stacked on a phone the moments and the
+     live copy carry the same story without a long thin column. */
+  .lwc-service-track {
+    display: none;
+  }
+
   .lwc-intro {
     padding-block: 54px;
   }
@@ -1516,23 +1520,9 @@
     margin-left: 0;
   }
 
-  .lwc-rail {
-    margin-inline: 24px;
-  }
-
   .lwc-stop {
+    padding: 6px 9px;
     font-size: 9.5px;
-  }
-
-  .lwc-plate {
-    width: 50px;
-    height: 50px;
-    margin: -25px 0 0 -25px;
-  }
-
-  .lwc-plate i {
-    width: 33px;
-    height: 33px;
   }
 
   .lwc-close-foot {
@@ -1542,17 +1532,8 @@
 
 @media (max-width: 420px) {
   .lwc-stop {
-    font-size: 0;
-  }
-
-  .lwc-stop::after {
-    content: attr(data-short);
-    font-size: 9.5px;
-  }
-
-  .lwc-window-tag {
-    font-size: 10.5px;
-    padding: 8px 11px;
+    padding: 6px 8px;
+    font-size: 9px;
   }
 }
 
@@ -1578,7 +1559,7 @@
   }
 }
 
-/* ---------- The light switch under the window ---------- */
+/* ---------- Picking a seat under the window ---------- */
 
 .lwc-window-note {
   display: flex;
@@ -1591,42 +1572,147 @@
   font-size: 11.5px;
 }
 
-.lwc-light {
-  display: flex;
-  overflow: hidden;
-  background: rgba(27, 44, 34, 0.9);
-  border: 1px solid rgba(255, 122, 92, 0.42);
-  border-radius: 2px;
-  backdrop-filter: blur(8px);
+.lwc-floor-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
-.lwc-light-btn {
-  min-height: 34px;
-  padding: 0 12px;
-  color: #eee8dc;
-  background: transparent;
-  border: 0;
-  border-left: 1px solid rgba(247, 242, 226, 0.16);
+.lwc-floor-line i {
+  width: 6px;
+  height: 6px;
+  background: var(--lwc-brass);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(220, 184, 122, 0.16);
+}
+
+.lwc-seats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.lwc-seats-label {
+  margin-right: 4px;
+  color: #9fb1a0;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lwc-seat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: #cfd9cd;
+  background: rgba(23, 39, 30, 0.92);
+  border: 1px solid rgba(247, 242, 226, 0.18);
+  border-radius: 2px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 11.5px;
-  transition: background 0.2s ease, color 0.2s ease;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
-.lwc-light-btn:first-child {
-  border-left: 0;
+.lwc-seat[data-state='available'] {
+  color: #f7f2e2;
+  border-color: rgba(220, 184, 122, 0.72);
 }
 
-.lwc-light-btn:hover {
-  color: #fff;
-  background: rgba(247, 242, 226, 0.08);
-}
-
-.lwc-light-btn[aria-pressed='true'] {
+.lwc-seat[data-state='available']:hover,
+.lwc-seat[data-state='available']:focus-visible {
   color: #1e3126;
   background: var(--lwc-brass);
-  font-weight: 600;
+  border-color: var(--lwc-brass);
+  transform: translateY(-2px);
 }
+
+/* A taken table is the state a guest most needs to see, so occupied is the brightest
+   chip on the row instead of the dimmest: solid rust, a cream numeral and a lit dot. */
+.lwc-seat[data-state='occupied'] {
+  color: #fdf3e6;
+  background: #b8492e;
+  border-color: #d1603f;
+  cursor: not-allowed;
+}
+
+.lwc-seat[data-state='occupied']::after {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  content: '';
+  background: #ffd9a8;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(184, 73, 46, 0.9);
+}
+
+.lwc-seat[data-state='reserved'] {
+  color: #f0d3a1;
+  background: rgba(120, 80, 30, 0.62);
+  border: 1px dashed #d9a55c;
+  cursor: not-allowed;
+}
+
+.lwc-seat[data-state='maintenance'],
+.lwc-seat[data-state='unknown'] {
+  color: #8a9a88;
+  border-style: dashed;
+  border-color: rgba(247, 242, 226, 0.16);
+  cursor: default;
+  opacity: 0.62;
+}
+
+/* Two small swatches read the row without spelling it out. */
+.lwc-seat-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  color: #9fb1a0;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lwc-seat-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.lwc-seat-legend i[data-state='available'] {
+  background: #dcb87a;
+}
+
+.lwc-seat-legend i[data-state='occupied'] {
+  margin-left: 7px;
+  background: #b8492e;
+}
+
+@media (max-width: 720px) {
+  .lwc-hero-foot .lwc-seats {
+    margin-left: 0;
+  }
+
+  .lwc-seat {
+    width: 30px;
+    height: 30px;
+  }
+
+  .lwc-seat-legend {
+    display: none;
+  }
+}
+
 
 /* ---------- Crossing the threshold into the café ---------- */
 
@@ -1753,23 +1839,10 @@
   }
 }
 
-@media (max-width: 720px) {
-  .lwc-window-tag {
-    bottom: 14px;
-    left: 14px;
-    font-size: 10.5px;
-    padding: 8px 11px;
-  }
-
-  .lwc-hero-foot .lwc-light {
-    margin-left: 0;
-  }
-}
 
 @media (max-width: 420px) {
-  .lwc-light-btn {
-    padding: 0 10px;
-    font-size: 11px;
+  .lwc-seats-label {
+    display: none;
   }
 }
 

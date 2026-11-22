@@ -46,6 +46,7 @@ export const orderApi = {
   cancelOrder: (id, reason, tableToken) =>
     api.patch(`/orders/${id}/cancel`, { reason, tableToken }),
   clearOrder: (id) => api.delete(`/orders/${id}`),
+  notifyGuest: (id) => api.post(`/orders/${id}/notify`),
   getKitchenOrders: () => api.get('/orders/kitchen'),
   getDisplayOrders: () => api.get('/orders/display'),
   getStats: (period) => api.get('/orders/stats', { params: { period } }),

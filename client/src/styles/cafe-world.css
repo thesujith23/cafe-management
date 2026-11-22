@@ -264,6 +264,9 @@
 .cafe-quick-actions > button:hover,
 .cafe-quick-actions > a.cafe-quick-link:hover { background: #3f614d; transform: translateY(-1px); }
 .cafe-quick-actions > button b { min-width: 18px; padding: 1px 4px; color: #345140; background: #eadfca; text-align: center; font-weight: 700; }
+.cafe-quick-actions > button.is-night { color: #dfe8f2; background: #2a3b48; border-color: #1e2b34; }
+.cafe-quick-actions > button.is-night:hover { background: #344a59; }
+.cafe-world-page.is-night .cafe-3d-world { background: linear-gradient(#1b232b 0%, #141b21 58%, #0d1114 100%); }
 .cafe-quick-hint { padding: 6px 9px; color: #666054; background: rgba(248, 240, 220, .9); border: 1px dashed #f7866d; font: 9px var(--cafe-font-mono); }
 @media (max-width: 860px) { .cafe-quick-actions { left: 10px; } .cafe-quick-hint { display: none; } }
 /* Phones: icons only, but never smaller than a thumb. */
@@ -387,6 +390,28 @@ body.cafe-airlock-ready .cafe-world-page.is-riding-in .cafe-3d-world {
   animation: cafe-airlock-fade 1.7s cubic-bezier(.2,.62,.24,1) both;
 }
 
+/* Opening mist: the room sits inside a cool haze that lifts over the first seconds while
+   the 3D camera glides in, then leaves only the light drift built into the scene. */
+.cafe-opening-mist {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 44% at 34% 62%, rgba(255, 255, 255, .92), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(52% 38% at 68% 36%, rgba(246, 249, 244, .84), rgba(246, 249, 244, 0) 70%),
+    radial-gradient(70% 52% at 50% 90%, rgba(255, 253, 245, .86), rgba(255, 253, 245, 0) 74%),
+    linear-gradient(rgba(255, 255, 255, .58), rgba(255, 255, 255, .26));
+  opacity: .95;
+  animation: cafe-opening-mist-clear 3.4s cubic-bezier(.22,.61,.24,1) both;
+}
+
+@keyframes cafe-opening-mist-clear {
+  0% { opacity: .95; transform: scale(1.015); }
+  42% { opacity: .62; }
+  100% { opacity: 0; transform: none; }
+}
+
 /* Starts opaque where the landing mist left off, then opens slowly out of the scene. */
 @keyframes cafe-airlock-fade {
   0% { opacity: .96; }
@@ -403,6 +428,7 @@ body.cafe-airlock-ready .cafe-world-page.is-riding-in .cafe-3d-world {
   .scene-food-orb { animation: none !important; }
   /* The fabric rests at .96 opacity while animated, so with motion off it must be removed outright. */
   .cafe-airlock-fabric { display: none !important; }
+  .cafe-opening-mist { display: none !important; }
   body.cafe-airlock-ready .cafe-world-page.is-riding-in .cafe-3d-world { animation: none !important; }
 }
 

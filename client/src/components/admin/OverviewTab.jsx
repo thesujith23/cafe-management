@@ -5,10 +5,15 @@ import CountUp from '../animations/CountUp';
 import TiltedCard from '../animations/TiltedCard';
 import { formatINR, formatTimeOnly } from '../../utils/formatters';
 import { guestName, itemWord, orderItemCount, orderTableCode, orderTableLabel } from '../../utils/orderDisplay';
+import { summariseTables } from '../../utils/tableAvailability';
 
 // Dashboard home: the four numbers, the shortcuts, and the last five orders — in that order.
 
 const OverviewTab = ({ stats, orders, tables, onOpenTab, onInspectTable, onInspectOrder }) => {
+  // The same rule the landing page and the café room use, so all three agree.
+  const floor = summariseTables(tables);
+  const totalTables = floor.total || 6;
+
   return (
     <div className="flex flex-col gap-6">
       {/* The four numbers lead: they are the first thing anyone checks on opening the console. */}
@@ -74,13 +79,13 @@ const OverviewTab = ({ stats, orders, tables, onOpenTab, onInspectTable, onInspe
             </div>
             <div className="text-2xl sm:text-3xl font-black text-space_indigo font-futura tracking-tight">
               <CountUp
-                to={tables.filter((t) => t.status === 'occupied').length}
+                to={floor.occupied}
                 duration={1.2}
               />
-              <span className="text-space_indigo-400 text-lg font-normal"> / 6</span>
+              <span className="text-space_indigo-400 text-lg font-normal"> / {totalTables}</span>
             </div>
             <div className="text-[11px] text-dusty_mauve-600 font-semibold mt-1 font-aleo">
-              {Math.max(0, 6 - tables.filter((t) => t.status === 'occupied').length)} free right now
+              {floor.free} free right now{floor.reserved ? ` · ${floor.reserved} reserved` : ''}
             </div>
           </div>
         </TiltedCard>
@@ -107,7 +112,7 @@ const OverviewTab = ({ stats, orders, tables, onOpenTab, onInspectTable, onInspe
 
         <div className="p-6 rounded-3xl bg-white border border-thistle-700 shadow-2xs space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-xl font-tenez text-space_indigo-100">6 Unique Dining Tables</h3>
+            <h3 className="font-bold text-xl font-tenez text-space_indigo-100">{totalTables} Unique Dining Tables</h3>
             <button
               onClick={() => onOpenTab('tables')}
               className="text-xs font-bold font-aleo text-dusty_mauve-600 hover:underline cursor-pointer"

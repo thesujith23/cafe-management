@@ -188,7 +188,7 @@
 .order-status-pill.is-ready { color: #416951; background: #f3efe6; }
 .order-status-pill.is-cancelled { color: #7a4531; background: #f7eae2; }
 .order-status-pill.is-done { color: #575245; background: #f7f2ea; }
-.order-progress { position: relative; margin: 0 21px; padding: 11px 4px 15px; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid #f6f2e9; border-bottom: 1px solid #f6f2e9; }
+.order-progress { position: relative; margin: 0 21px; padding: 11px 4px 15px;   display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #f6f2e9; border-bottom: 1px solid #f6f2e9; }
 .order-progress-step { position: relative; display: grid; justify-items: center; gap: 6px; color: #6f6757; }
 .order-progress-step:not(:last-child)::after { position: absolute; top: 14px; left: calc(50% + 18px); width: calc(100% - 36px); height: 1px; content: ''; background: #f4efe3; }
 .order-progress-step.is-complete::after { background: #9bb8a6; }

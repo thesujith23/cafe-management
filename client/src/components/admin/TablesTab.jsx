@@ -2,10 +2,15 @@ import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { CheckCircle2, ExternalLink, Plus, Printer } from 'lucide-react';
 import { formatTimeOnly } from '../../utils/formatters';
+import { summariseTables } from '../../utils/tableAvailability';
 
 // The floor: each table's QR, who is sitting there, and the seat / free controls.
 
 const TablesTab = ({ tables, onFreeTable, onSeatTable, onShowStandee }) => {
+  // Counted the one way the whole app counts them, and shown as a breakdown so the
+  // chips add up to the floor instead of leaving reserved tables invisible.
+  const floor = summariseTables(tables);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -26,10 +31,15 @@ const TablesTab = ({ tables, onFreeTable, onSeatTable, onShowStandee }) => {
 
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200">
-              {tables.filter((t) => t.status === 'occupied').length} Occupied
+              {floor.occupied} Occupied
             </span>
+            {floor.reserved > 0 && (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                {floor.reserved} Reserved
+              </span>
+            )}
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-              {tables.filter((t) => t.status === 'available').length} Available
+              {floor.available} Available
             </span>
           </div>
         </div>

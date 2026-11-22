@@ -5,6 +5,7 @@ import CafeSettings from '../models/CafeSettings.js';
 import OrderStatusHistory from '../models/OrderStatusHistory.js';
 import DiningTable from '../models/DiningTable.js';
 import { withProgress, withProgressList, loadOrderTimeline } from '../services/progressService.js';
+import { notifyOrderReady } from '../services/notificationService.js';
 import { fallbackMenuItems } from './menuController.js';
 import { isDemoToken, demoTableFor } from '../middleware/validateQR.js';
 import { publicOrderView } from '../utils/publicOrder.js';
@@ -407,7 +408,14 @@ export const updateOrderStatus = async (req, res, next) => {
       order.preparingAt = new Date();
       order.readyAt = undefined;
     }
-    if (targetStatus === 'ready') order.readyAt = new Date();
+    if (targetStatus === 'ready') {
+      order.readyAt = new Date();
+      // Marking it ready is itself the guest's pickup notice (notifyOrderReady below),
+      // so stamp it here: the counter can see when they were told, and a manual re-ping
+      // has to respect the cooldown instead of firing twice in a second.
+      order.guestNotifiedAt = new Date();
+      order.guestNotifyCount = (order.guestNotifyCount || 0) + 1;
+    }
     if (targetStatus === 'completed') {
       order.completedAt = new Date();
       if (order.table && mongoose.Types.ObjectId.isValid(order.table)) {
@@ -470,6 +478,12 @@ export const updateOrderStatus = async (req, res, next) => {
       io.to(`order:${order._id}`).emit('order:status:changed', payload);
     }
 
+    // Ready is the one transition the guest must hear even if they are not looking at
+    // the tracker: record it and ring their open screen with a pickup message.
+    if (targetStatus === 'ready') {
+      await notifyOrderReady(io, updatedOrder);
+    }
+
     recordAudit(req, 'order_status_changed', {
       targetModel: 'Order',
       targetId: order._id,
@@ -477,6 +491,69 @@ export const updateOrderStatus = async (req, res, next) => {
     });
 
     res.json({ success: true, data: updatedOrder, order: updatedOrder });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// A guest can be rung again, but not faster than this: a double click must not buzz
+// their phone twice.
+const GUEST_NOTIFY_COOLDOWN_MS = 60 * 1000;
+
+// @desc    Send the ready-for-pickup message to the guest again (counter/owner)
+// @route   POST /api/orders/:id/notify
+export const notifyGuest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const order = await Order.findById(id).populate('table', 'tableId displayName');
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    if (order.preparationStatus !== 'ready') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only an order waiting at the counter can be sent a pickup message.',
+      });
+    }
+
+    const lastNotifiedAt = order.guestNotifiedAt ? new Date(order.guestNotifiedAt).getTime() : 0;
+    const elapsed = lastNotifiedAt ? Date.now() - lastNotifiedAt : Infinity;
+    if (elapsed < GUEST_NOTIFY_COOLDOWN_MS) {
+      const retryAfterSeconds = Math.ceil((GUEST_NOTIFY_COOLDOWN_MS - elapsed) / 1000);
+      return res.status(429).json({
+        success: false,
+        retryAfterSeconds,
+        message: `The guest was already notified ${Math.max(1, Math.floor(elapsed / 1000))} s ago. Try again in ${retryAfterSeconds} s.`,
+      });
+    }
+
+    order.guestNotifiedAt = new Date();
+    order.guestNotifyCount = (order.guestNotifyCount || 0) + 1;
+    await order.save();
+
+    const updatedOrder = withProgress(order);
+    const io = req.app.get('io');
+    const notification = await notifyOrderReady(io, updatedOrder);
+
+    recordAudit(req, 'order_guest_notified', {
+      targetModel: 'Order',
+      targetId: order._id,
+      details: { orderNumber: order.orderNumber, notifyCount: order.guestNotifyCount, role: req.user?.role },
+    });
+
+    res.json({
+      success: true,
+      message: 'Guest notified',
+      data: {
+        order: updatedOrder,
+        notifiedAt: order.guestNotifiedAt,
+        notifyCount: order.guestNotifyCount,
+        notification,
+      },
+    });
   } catch (error) {
     next(error);
   }

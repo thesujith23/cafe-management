@@ -111,6 +111,13 @@ const orderSchema = new mongoose.Schema({
   completedAt: Date,
   cancelledAt: Date,
   cancelReason: String,
+  // When the guest was told their order is ready, and how many times — the counter
+  // shows this next to its manual "Notify guest" button.
+  guestNotifiedAt: Date,
+  guestNotifyCount: {
+    type: Number,
+    default: 0,
+  },
   estimatedPrepTime: {
     type: Number,
     default: 0,

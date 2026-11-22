@@ -3,13 +3,13 @@ import OrderStatusHistory from '../models/OrderStatusHistory.js';
 const MINUTE = 60 * 1000;
 const DEFAULT_PREP_MINUTES = 15;
 
-// Each stage owns a slice of the 0-100 band. `accepted` is not a customer step, but it
-// is a real state on the order and it anchors the ETA before cooking starts.
+// Each stage owns a slice of the 0-100 band. `accepted` is the kitchen acknowledging the
+// ticket; it is its own stage on the guest rail and it anchors the ETA before cooking starts.
 const STAGES = [
   { key: 'new', label: 'Awaiting counter', start: 0, end: 6 },
   // Counter confirmation sits between payment and the kitchen picking the ticket up.
   { key: 'confirmed', label: 'Sent to kitchen', start: 6, end: 12 },
-  { key: 'accepted', label: 'In the kitchen', start: 12, end: 18 },
+  { key: 'accepted', label: 'Accepted by kitchen', start: 12, end: 18 },
   { key: 'preparing', label: 'Cooking', start: 18, end: 90 },
   { key: 'ready', label: 'Ready', start: 90, end: 96 },
   { key: 'completed', label: 'Served', start: 96, end: 100 },

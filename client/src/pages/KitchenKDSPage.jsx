@@ -26,10 +26,8 @@ const COLUMNS = [
   {
     id: 'confirmed',
     title: 'Confirmed',
-    hint: 'At the pass · start when ready',
+    hint: 'Accept the ticket, then start cooking',
     icon: ClipboardList,
-    action: 'Start cooking',
-    next: 'preparing',
     empty: 'No tickets waiting',
   },
   {
@@ -281,7 +279,7 @@ const KitchenKDSPage = () => {
                       {col.id === 'ready' ? <CheckCircle2 aria-hidden="true" /> : <ColumnIcon aria-hidden="true" />}
                       <strong>{col.empty}</strong>
                       <span>
-                        {col.id === 'confirmed' && 'Confirmed tickets land here after the counter checks them.'}
+                        {col.id === 'confirmed' && 'Confirmed tickets land here after the counter checks them — accept one to start it.'}
                         {col.id === 'preparing' && 'Start a ticket and it moves onto the stove.'}
                         {col.id === 'ready' && 'Plated tickets wait here for the counter to run them out.'}
                       </span>
@@ -310,7 +308,7 @@ const KitchenKDSPage = () => {
                                 {order.preparationStatus === 'accepted' && (
                                   <>
                                     <span className="kds-order-dot" aria-hidden="true" />
-                                    Queued
+                                    Accepted · waiting to start
                                   </>
                                 )}
                               </span>
@@ -347,17 +345,37 @@ const KitchenKDSPage = () => {
                             </p>
                           )}
 
-                          <button
-                            type="button"
-                            className="kds-action"
-                            onClick={() => handleUpdateStatus(order._id, col.next)}
-                            disabled={busy}
-                          >
-                            {col.id === 'confirmed' && <Flame aria-hidden="true" />}
-                            {col.id === 'preparing' && <BellRing aria-hidden="true" />}
-                            {col.id === 'ready' && <Check aria-hidden="true" />}
-                            {busy ? 'Updating…' : col.action}
-                          </button>
+                          {col.id === 'confirmed' ? (
+                            <button
+                              type="button"
+                              className="kds-action"
+                              onClick={() => handleUpdateStatus(
+                                order._id,
+                                order.preparationStatus === 'accepted' ? 'preparing' : 'accepted'
+                              )}
+                              disabled={busy}
+                            >
+                              {order.preparationStatus === 'accepted'
+                                ? <Flame aria-hidden="true" />
+                                : <Check aria-hidden="true" />}
+                              {busy
+                                ? 'Updating…'
+                                : order.preparationStatus === 'accepted'
+                                  ? 'Start cooking'
+                                  : 'Accept ticket'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="kds-action"
+                              onClick={() => handleUpdateStatus(order._id, col.next)}
+                              disabled={busy}
+                            >
+                              {col.id === 'preparing' && <BellRing aria-hidden="true" />}
+                              {col.id === 'ready' && <Check aria-hidden="true" />}
+                              {busy ? 'Updating…' : col.action}
+                            </button>
+                          )}
                         </article>
                       );
                     })

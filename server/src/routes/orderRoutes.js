@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
   createOrder, getOrder, getOrders, getOrdersByToken,
   updateOrderStatus, updateOrderItem, getKitchenOrders, getDisplayOrders,
-  getOrderTimeline, getOrderStats, getSalesReport, cancelOrder, clearOrder,
+  getOrderTimeline, getOrderStats, getSalesReport, cancelOrder, clearOrder, notifyGuest,
 } from '../controllers/orderController.js';
 import { protect, authorize, optionalAuth } from '../middleware/auth.js';
 import validateQRToken from '../middleware/validateQR.js';
@@ -38,6 +38,8 @@ router.post('/:id/clear', protect, authorize(...STAFF), clearOrder);
 router.get('/:id/timeline', protect, authorize(...WORKERS), getOrderTimeline);
 router.get('/:id', protect, authorize(...WORKERS), getOrder);
 router.patch('/:id/status', protect, authorize(...WORKERS), validateBody(orderStatusSchema), updateOrderStatus);
+// Only the counter and the owner may call a guest back to collect a ready ticket.
+router.post('/:id/notify', protect, authorize(...STAFF), notifyGuest);
 router.patch('/:id/items/:itemId', protect, authorize(...WORKERS), validateBody(orderItemSchema), updateOrderItem);
 
 export default router;

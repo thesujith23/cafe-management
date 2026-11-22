@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BellRing, CalendarDays, ChefHat, Coffee, Eye, Flame, HelpCircle, ShoppingBag, Trees, Utensils, Waves, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BellRing, CalendarDays, ChefHat, Coffee, Eye, Flame, HelpCircle, Moon, ShoppingBag, Sun, Trees, Utensils, Waves, X } from 'lucide-react';
 import { tableApi, orderApi } from '../api/apiServices';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
@@ -71,7 +71,7 @@ const getKitchenVisualType = (item) => {
 const getOrderKey = (order) => String(order?._id || order?.orderNumber || order?.displayOrderId || '');
 
 const SCENE_SHOWCASES = {
-  table: { title: 'A seat at the table', caption: 'Watch the guests share a meal and conversation.', icon: Utensils },
+  table: { title: 'A seat at the table', caption: 'See who is sitting at this table right now.', icon: Utensils },
   kitchen: { title: 'In the kitchen', caption: 'Chefs stir, plate, and prepare the next dish.', icon: ChefHat },
   counter: { title: 'At the counter', caption: 'The barista takes an order and gets it ready.', icon: Coffee },
   trees: { title: 'Under the trees', caption: 'Garden birds circle the canopy and settle nearby.', icon: Trees },
@@ -88,6 +88,26 @@ const CafePage = () => {
   const canWorkOrdersRef = useRef(false);
   canWorkOrdersRef.current = ['owner', 'counter', 'kitchen'].includes(user?.role);
   const [helpOpen, setHelpOpen] = useState(false);
+  // Day is the room's default; the choice is remembered per browser so someone who
+  // prefers the evening room is not sent back into morning light on every visit.
+  const [ambientMode, setAmbientMode] = useState(() => {
+    try {
+      return window.localStorage.getItem('cafe-ambient') === 'night' ? 'night' : 'day';
+    } catch {
+      return 'day';
+    }
+  });
+  const toggleAmbient = useCallback(() => {
+    setAmbientMode((current) => {
+      const next = current === 'night' ? 'day' : 'night';
+      try {
+        window.localStorage.setItem('cafe-ambient', next);
+      } catch {
+        // Private mode: the room still switches, it just will not be remembered.
+      }
+      return next;
+    });
+  }, []);
   const [tables, setTables] = useState(FALLBACK_TABLES);
   const [orders, setOrders] = useState({ queued: [], preparing: [], ready: [] });
   const [hasLoadedOrders, setHasLoadedOrders] = useState(false);
@@ -479,7 +499,7 @@ const CafePage = () => {
   const orderStageLabel = (order) => ({
     new: 'Awaiting counter',
     confirmed: 'Sent to kitchen',
-    accepted: 'Sent to kitchen',
+    accepted: 'Accepted by kitchen',
     preparing: 'Cooking',
     ready: 'Ready',
   }[order.preparationStatus] || 'New');
@@ -502,11 +522,28 @@ const CafePage = () => {
   const focusedTable = tables.find((table) => table.tableId === sceneFocus?.tableId);
   const sceneShowcase = sceneFocus ? SCENE_SHOWCASES[sceneFocus.place] : null;
   const SceneShowcaseIcon = sceneShowcase?.icon || Eye;
+  // The room only ever shows real guests, so the copy has to follow the live table
+  // status instead of promising a meal at a table nobody is sitting at.
+  const tableShowcaseCaption = !focusedTable
+    ? SCENE_SHOWCASES.table.caption
+    : focusedTable.status === 'occupied'
+      ? 'Guests are seated here and eating right now.'
+      : focusedTable.status === 'reserved'
+        ? 'Reserved for a later visit — nobody is seated yet.'
+        : 'This table is free right now — nobody is seated.';
+  const tableShowcaseButton = selectedTable?.status === 'occupied'
+    ? { title: 'Watch animation', detail: 'Guests are sitting and eating' }
+    : selectedTable?.status === 'reserved'
+      ? { title: 'Look at this table', detail: 'Held for a booking · nobody seated' }
+      : { title: 'Look at this table', detail: 'Free right now · nobody seated' };
 
   return (
-    <main className={'cafe-world-page cafe-world-3d' + (location.state?.fromLandingRide ? ' is-riding-in' : '')}>
-      <CafeScene tables={tables} orders={orders} onSelectTable={handleSceneTableClick} onSelectStation={openStationPopup} onSelectSceneFeature={beginSceneShowcase} onSceneFocusStage={handleSceneFocusStage} sceneFocus={sceneFocus} onGuestCompleted={completeGuestOrder} kitchenFocusOrder={kitchenViewOrder} onKitchenCameraStage={handleKitchenCameraStage} />
+    <main className={'cafe-world-page cafe-world-3d' + (location.state?.fromLandingRide ? ' is-riding-in' : '') + (ambientMode === 'night' ? ' is-night' : '')}>
+      <CafeScene tables={tables} orders={orders} onSelectTable={handleSceneTableClick} onSelectStation={openStationPopup} onSelectSceneFeature={beginSceneShowcase} onSceneFocusStage={handleSceneFocusStage} sceneFocus={sceneFocus} onGuestCompleted={completeGuestOrder} kitchenFocusOrder={kitchenViewOrder} onKitchenCameraStage={handleKitchenCameraStage} ambientMode={ambientMode} />
       {location.state?.fromLandingRide && <div className="cafe-airlock-fabric" aria-hidden="true" />}
+      {/* The room fades up through a cool haze; arriving from the landing ride already
+          has its own airlock reveal, so the two never stack. */}
+      {!location.state?.fromLandingRide && <div className="cafe-opening-mist" aria-hidden="true" />}
       {/* Visible shortcuts: the scene is discoverable by clicking, but nobody should have to guess
           how to get out of it or where the staff side lives. */}
       <div className="cafe-quick-actions" role="group" aria-label="Café room shortcuts">
@@ -523,6 +560,15 @@ const CafePage = () => {
           <HelpCircle size={15} />
           <span>How it works</span>
         </button>
+        <button
+          type="button"
+          className={ambientMode === 'night' ? 'is-night' : ''}
+          aria-pressed={ambientMode === 'night'}
+          onClick={toggleAmbient}
+        >
+          {ambientMode === 'night' ? <Sun size={15} /> : <Moon size={15} />}
+          <span>{ambientMode === 'night' ? 'Morning light' : 'Evening light'}</span>
+        </button>
         <span className="cafe-quick-hint">Click a table to seat or order · keys 1–6</span>
       </div>
       <Modal isOpen={helpOpen} onClose={() => setHelpOpen(false)} title="How this café room works" maxWidth="max-w-md">
@@ -536,17 +582,29 @@ const CafePage = () => {
       </Modal>
       {selectedTableForAction && <aside className="cafe-table-choice" role="dialog" aria-label={`${selectedTableName} options`}>
         <button type="button" className="cafe-table-choice-close" aria-label="Close table options" onClick={() => setSelectedTableForAction(null)}><X size={16} /></button>
-        <small>{selectedTableIsReserved ? 'RESERVED SEAT' : 'YOUR TABLE'}</small>
+        {/* The room states the same status the landing page and the console count, so a
+            guest is never told a taken table is theirs. */}
+        <small>
+          {selectedTableIsReserved
+            ? 'RESERVED SEAT'
+            : selectedTable?.status === 'occupied'
+              ? 'OCCUPIED TABLE'
+              : 'AVAILABLE TABLE'}
+        </small>
         <h2>{selectedTableName}</h2>
-        <p>{selectedTableIsReserved ? 'This table is reserved for its seated guests.' : 'What would you like to do?'}</p>
+        <p>
+          {selectedTableIsReserved
+            ? 'This table is reserved for its seated guests.'
+            : 'What would you like to do?'}
+        </p>
         <div className={`cafe-table-choice-actions ${selectedTableIsReserved ? 'is-reserved' : ''}`}>
-          <button type="button" onClick={() => beginSceneShowcase('table', selectedTableForAction)}><Eye size={16} /><span><strong>Watch animation</strong><small>A guest sits and eats</small></span></button>
+          <button type="button" onClick={() => beginSceneShowcase('table', selectedTableForAction)}><Eye size={16} /><span><strong>{tableShowcaseButton.title}</strong><small>{tableShowcaseButton.detail}</small></span></button>
           {!selectedTableIsReserved && <button type="button" onClick={() => openTable(selectedTableForAction)}><Coffee size={16} /><span><strong>Order food</strong><small>Browse the cafe menu</small></span></button>}
         </div>
       </aside>}
       {sceneFocus && sceneShowcase && <aside className={`cafe-scene-showcase ${sceneFocusStage === 'travelling' ? 'is-travelling' : ''} ${sceneFocus.place === 'table' ? 'is-table-showcase' : ''}`} role="status" aria-live="polite">
         <span className="cafe-scene-showcase-icon"><SceneShowcaseIcon size={18} /></span>
-        <div><small>{sceneFocusStage === 'travelling' ? 'Moving through the cafe' : 'Happening in the cafe'}</small><strong>{sceneFocus.place === 'table' ? (focusedTable?.displayName || focusedTable?.tableId || sceneShowcase.title) : sceneShowcase.title}</strong><span>{sceneShowcase.caption}</span>{sceneFocusStage === 'focused' && <i className="cafe-scene-showcase-progress" />}</div>
+        <div><small>{sceneFocusStage === 'travelling' ? 'Moving through the cafe' : 'Happening in the cafe'}</small><strong>{sceneFocus.place === 'table' ? (focusedTable?.displayName || focusedTable?.tableId || sceneShowcase.title) : sceneShowcase.title}</strong><span>{sceneFocus.place === 'table' ? tableShowcaseCaption : sceneShowcase.caption}</span>{sceneFocusStage === 'focused' && <i className="cafe-scene-showcase-progress" />}</div>
         <button type="button" aria-label="Close animation" onClick={closeSceneShowcase}><X size={16} /></button>
       </aside>}
       {incomingOrder && <aside className="cafe-order-arrival" role="status" aria-live="assertive">
