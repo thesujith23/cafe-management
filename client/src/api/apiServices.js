@@ -71,4 +71,6 @@ import api from './axios';
 
 export const chatBotApi = {
   sendMessage: (message) => api.post('/chat', { message }),
+  // Returns the spoken reply as an audio blob (or rejects when voice is not configured).
+  speak: (text) => api.post('/chat/speak', { text }, { responseType: 'blob' }),
 };

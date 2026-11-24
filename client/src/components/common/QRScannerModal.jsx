@@ -42,7 +42,12 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
   const fileInputRef = useRef(null);
   const processingRef = useRef(false);
   const cameraActiveRef = useRef(false);
+  const startingRef = useRef(false);
   const scannerGenerationRef = useRef(0);
+  // The decoder is kept in a ref so `startScanner` can stay stable. Without this, every
+  // parent re-render (the console polls every 15s) rebuilt the start effect and tore the
+  // camera down and up again — html5-qrcode answers that with "already under transition".
+  const decodeHandlerRef = useRef(null);
 
   const stopScanner = useCallback(async () => {
     scannerGenerationRef.current += 1;
@@ -119,20 +124,26 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
     }
   }, [continueToTable]);
 
+  useEffect(() => {
+    decodeHandlerRef.current = handleDecodedText;
+  }, [handleDecodedText]);
+
   const startScanner = useCallback(async () => {
+    // Only one start in flight at a time; a second overlapping call is refused by the library.
+    if (startingRef.current || cameraActiveRef.current) return;
+    startingRef.current = true;
     setCameraError('');
     try {
       if (!html5QrCodeRef.current) {
         html5QrCodeRef.current = new Html5Qrcode('qr-reader-region');
       }
-      if (cameraActiveRef.current) return;
       const generation = scannerGenerationRef.current + 1;
       scannerGenerationRef.current = generation;
 
       await html5QrCodeRef.current.start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => handleDecodedText(decodedText),
+        (decodedText) => decodeHandlerRef.current?.(decodedText),
         () => {},
       );
       if (scannerGenerationRef.current !== generation) {
@@ -146,8 +157,10 @@ const QRScannerModal = ({ isOpen, onClose, onSelectToken }) => {
       setCameraError(
         'Camera permission was denied or camera is not available. You can upload a QR image or select your table below.'
       );
+    } finally {
+      startingRef.current = false;
     }
-  }, [handleDecodedText]);
+  }, []);
 
   useEffect(() => {
     if (isOpen && activeMode === 'camera') {

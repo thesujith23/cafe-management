@@ -18,7 +18,7 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 import RequireAuth from './components/common/RequireAuth';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import ChatBubble from './components/common/ChatBubble';
+import FoxChatWidget from './components/common/FoxChatWidget';
 import SmoothScroll from './components/animations/SmoothScroll';
 
 
@@ -28,17 +28,18 @@ import './styles/design-system.css';
 import './styles/premium-redesign.css';
 import './styles/icon-motion.css';
 import './styles/security.css';
+import './styles/fox-widget.css';
 import './styles/index.css';
 
-// The chat widget belongs to the guest experience only: the public website and the
-// table-side ordering flow a QR code opens. Staff screens stay clean.
+// Finnegan, the 3D café fox, belongs to the guest experience only: the public website and
+// the table-side ordering flow a QR code opens. Staff screens stay clean.
 const GUEST_CHAT_PATHS = ['/table/', '/order/', '/track/'];
 
 function GuestChatWidget() {
   const { pathname } = useLocation();
   const isGuestRoute = pathname === '/'
     || GUEST_CHAT_PATHS.some((path) => pathname.startsWith(path));
-  return isGuestRoute ? <ChatBubble /> : null;
+  return isGuestRoute ? <FoxChatWidget /> : null;
 }
 
 function App() {

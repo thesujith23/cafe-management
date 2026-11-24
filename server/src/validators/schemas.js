@@ -92,6 +92,11 @@ export const chatSchema = z.object({
   message: z.string().trim().min(1).max(500),
 });
 
+// Replies are already capped at a sentence or two; this is the hard ceiling for speech.
+export const speakSchema = z.object({
+  text: z.string().trim().min(1).max(400),
+});
+
 export const menuItemSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(500).optional().default(''),

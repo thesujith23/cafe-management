@@ -91,7 +91,11 @@ function ProjectLandingPage() {
   const rootRef = useRef(null);
   const windowRef = useRef(null);
   const entryTimers = useRef([]);
+  const passRef = useRef(null);
   const passScrollRef = useRef(null);
+  const stopRefs = useRef([]);
+  const railDrag = useRef(null);
+  const stageRef = useRef(0);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [bookingTable, setBookingTable] = useState('');
   const [stage, setStage] = useState(0);
@@ -170,6 +174,16 @@ function ProjectLandingPage() {
       speed: Number(layer.dataset.parallax) || 0,
     }));
     const pass = passScrollRef.current;
+    const section = passRef.current;
+    const plateEl = section?.querySelector('.lwc-service-plate');
+    const railPath = section?.querySelector('.lwc-service-line');
+    // The rail is a fixed viewBox path, so its length is measured once and reused.
+    let pathLength = 0;
+    try {
+      pathLength = railPath?.getTotalLength?.() || 0;
+    } catch {
+      pathLength = 0;
+    }
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let frame = 0;
     const lastStage = PASS_STAGES.length - 1;
@@ -214,7 +228,25 @@ function ProjectLandingPage() {
         const raw = -passRect.top / span;
         const progress = Math.min(1, Math.max(0, (raw - 0.06) / 0.88));
         const next = Math.min(lastStage, Math.max(0, Math.round(progress * lastStage)));
-        setStage((current) => (current === next ? current : next));
+        if (next !== stageRef.current) {
+          stageRef.current = next;
+          setStage(next);
+        }
+
+        // The meter reads straight from this, and the plate is walked along the drawn
+        // curve by distance, so its position is the scroll position and nothing else.
+        section?.style.setProperty('--pass-p', progress.toFixed(4));
+        if (plateEl) {
+          if (reduceMotion || !pathLength) {
+            const stopPoint = PASS_POINTS[next];
+            plateEl.style.setProperty('--plate-x', `${stopPoint.left}%`);
+            plateEl.style.setProperty('--plate-y', `${stopPoint.top}%`);
+          } else {
+            const point = railPath.getPointAtLength(progress * pathLength);
+            plateEl.style.setProperty('--plate-x', `${point.x.toFixed(2)}%`);
+            plateEl.style.setProperty('--plate-y', `${point.y.toFixed(2)}%`);
+          }
+        }
       }
     };
 
@@ -300,23 +332,90 @@ function ProjectLandingPage() {
     setBookingOpen(true);
   };
 
+  // Move the page the way the site already scrolls: through Lenis while it is running,
+  // the browser otherwise. `smooth: false` is only for dragging the rail.
+  const scrollWindowTo = (top, smooth = true) => {
+    if (window.__lenis?.scrollTo) {
+      window.__lenis.scrollTo(top, { immediate: !smooth });
+      return;
+    }
+    window.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+  };
+
   // The moment buttons move the page, not the state: the scroll position is the
   // single source of truth for which stop the plate is standing at.
   const goToStage = (index) => {
+    stageRef.current = index;
     setStage(index);
     const wrapper = passScrollRef.current;
     if (!wrapper) return;
     const rect = wrapper.getBoundingClientRect();
     const span = rect.height - window.innerHeight;
-    const pinned = window.matchMedia('(min-width: 861px)').matches
-      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // The pass pins on every width now, so a stop button jumps on phones as well.
+    const pinned = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!pinned || span < 120) return;
     // Inverse of the progress mapping in paint(), so a click lands on the stop.
     const target = (index / (PASS_STAGES.length - 1)) * 0.88 + 0.06;
-    window.scrollTo({ top: window.scrollY + rect.top + target * span, behavior: 'smooth' });
+    scrollWindowTo(window.scrollY + rect.top + target * span);
+  };
+
+  // Arrow keys walk the rail, Home/End take either end, and focus follows the moment
+  // that was chosen so the keyboard does not get lost in the pinned section.
+  const handleStopsKeyDown = (event) => {
+    const last = PASS_STAGES.length - 1;
+    let next = null;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = Math.min(last, stage + 1);
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = Math.max(0, stage - 1);
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = last;
+    if (next === null) return;
+    event.preventDefault();
+    goToStage(next);
+    stopRefs.current[next]?.focus({ preventScroll: true });
+  };
+
+  // Drag the rail to scrub the pinned pass with a mouse. Touch keeps native scrolling:
+  // fighting a thumb on a pinned section is worse than not offering the gesture.
+  const handleRailPointerDown = (event) => {
+    if (event.pointerType === 'touch' || event.button !== 0) return;
+    if (event.target.closest('button')) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const wrapper = passScrollRef.current;
+    if (!wrapper) return;
+    const span = wrapper.offsetHeight - window.innerHeight;
+    if (span < 120) return;
+    railDrag.current = { startY: event.clientY, startScroll: window.scrollY, span };
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch {
+      // A synthetic or already-released pointer still drags fine without capture.
+    }
+    event.preventDefault();
+  };
+
+  const handleRailPointerMove = (event) => {
+    const drag = railDrag.current;
+    if (!drag) return;
+    // About half a screen of drag covers the whole pass, so it never feels stuck.
+    const perPixel = drag.span / Math.max(240, window.innerHeight * 0.6);
+    scrollWindowTo(drag.startScroll + (drag.startY - event.clientY) * perPixel, false);
+  };
+
+  const endRailDrag = (event) => {
+    if (!railDrag.current) return;
+    railDrag.current = null;
+    try {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    } catch {
+      // The pointer can already be gone after a cancelled drag.
+    }
   };
 
   const active = PASS_STAGES[stage];
+  const remainingMoments = PASS_STAGES.length - 1 - stage;
+  const passCue = remainingMoments > 0
+    ? `${remainingMoments} more ${remainingMoments === 1 ? 'moment' : 'moments'}`
+    : 'Keep scrolling \u2193';
   // Same counting rule as the café room and the console (utils/tableAvailability).
   const floor = tables ? summariseTables(tables) : null;
   // The seats under the window read the same live floor as the café and the console,
@@ -524,18 +623,24 @@ function ProjectLandingPage() {
       </section>
 
       <div className="lwc-pass-scroll" ref={passScrollRef}>
-      <section className="lwc-pass" id="the-pass" data-stage={stage} aria-labelledby="lwc-pass-title">
+      <section className="lwc-pass" id="the-pass" ref={passRef} data-stage={stage} aria-labelledby="lwc-pass-title">
         <div className="lwc-pass-head">
           <h2 id="lwc-pass-title">Follow one plate.</h2>
           <p>Four moments between your chair and the pass. Most tickets go from paid to ready in under ten minutes — scroll, or pick a moment, to follow one plate through.</p>
         </div>
 
-        <div className="lwc-stops" role="group" aria-label="Jump to a moment in the service line">
+        <div
+          className="lwc-stops"
+          role="group"
+          aria-label="Jump to a moment in the service line"
+          onKeyDown={handleStopsKeyDown}
+        >
           {PASS_STAGES.map((step, index) => (
             <button
               key={step.label}
               type="button"
               className="lwc-stop"
+              ref={(element) => { stopRefs.current[index] = element; }}
               aria-current={index === stage ? 'true' : 'false'}
               onClick={() => goToStage(index)}
             >
@@ -545,13 +650,32 @@ function ProjectLandingPage() {
           ))}
         </div>
 
+        {/* How much of the pass is left to scroll. Without this a pinned phone screen
+            reads as a stuck page rather than a section that is waiting for you. */}
+        <div className="lwc-pass-meter" aria-hidden="true">
+          <span className="lwc-pass-count">
+            {String(stage + 1).padStart(2, '0')}
+            <i> / {String(PASS_STAGES.length).padStart(2, '0')}</i>
+          </span>
+          <span className="lwc-pass-track"><i /></span>
+          <span className="lwc-pass-cue">{passCue}</span>
+        </div>
+
         <div className="lwc-pass-body">
           {/* The service line: one plate on a quiet curve through the four stops. It is
               decoration, so it is hidden from assistive tech — the stops and the live
               copy above carry the same information. */}
-          <div className="lwc-service-track" aria-hidden="true">
+          <div
+            className="lwc-service-track"
+            role="group"
+            aria-label="The service line: pick a moment"
+            onPointerDown={handleRailPointerDown}
+            onPointerMove={handleRailPointerMove}
+            onPointerUp={endRailDrag}
+            onPointerCancel={endRailDrag}
+          >
             <div className="lwc-service-inner">
-              <svg className="lwc-service-path" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <svg className="lwc-service-path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path className="lwc-service-line" d={SERVICE_PATH} pathLength="100" />
                 <path
                   className="lwc-service-line is-done"
@@ -560,34 +684,49 @@ function ProjectLandingPage() {
                   style={{ strokeDashoffset: 100 - (stage / (PASS_STAGES.length - 1)) * 100 }}
                 />
               </svg>
-              {PASS_POINTS.map((point, index) => (
-                <i
-                  key={point.top}
+              {PASS_STAGES.map((step, index) => (
+                <button
+                  key={step.label}
+                  type="button"
                   className={'lwc-service-node' + (index <= stage ? ' is-done' : '')}
-                  style={{ left: `${point.left}%`, top: `${point.top}%` }}
-                />
+                  style={{ left: `${PASS_POINTS[index].left}%`, top: `${PASS_POINTS[index].top}%` }}
+                  aria-current={index === stage ? 'true' : undefined}
+                  aria-label={`Moment ${index + 1}: ${step.label}`}
+                  onClick={() => goToStage(index)}
+                >
+                  <span className="lwc-node-label">{step.short}</span>
+                </button>
               ))}
-              <div
+              <button
+                type="button"
                 className="lwc-service-plate"
-                style={{ left: `${PASS_POINTS[stage].left}%`, top: `${PASS_POINTS[stage].top}%` }}
+                title="Next moment"
+                aria-label={stage < PASS_STAGES.length - 1
+                  ? `Next moment: ${PASS_STAGES[stage + 1].label}`
+                  : 'Last moment of the pass'}
+                onClick={() => goToStage(Math.min(PASS_STAGES.length - 1, stage + 1))}
               >
-                <i style={{ backgroundImage: `url(${active.image})` }} />
-              </div>
+                <i style={{ backgroundImage: `url(${active.image})` }} aria-hidden="true" />
+              </button>
             </div>
           </div>
           <div className="lwc-pass-copy" aria-live="polite">
-            <span className="lwc-stage-time">{active.time}</span>
-            <h3>{active.title}</h3>
-            <p>{active.body}</p>
-            <dl className="lwc-stage-facts">
-              {active.facts.map((fact) => (
-                <div key={fact.key}>
-                  <dt>{fact.key}</dt>
-                  <dd>{fact.value}</dd>
-                </div>
-              ))}
-            </dl>
-            <span className="lwc-signal"><i aria-hidden="true" />{active.signal}</span>
+            {/* Keying on the stage remounts this block, so the copy fades in on every
+                stop instead of swapping text in place. */}
+            <div className="lwc-pass-copy-in" key={stage}>
+              <span className="lwc-stage-time">{active.time}</span>
+              <h3>{active.title}</h3>
+              <p>{active.body}</p>
+              <dl className="lwc-stage-facts">
+                {active.facts.map((fact) => (
+                  <div key={fact.key}>
+                    <dt>{fact.key}</dt>
+                    <dd>{fact.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <span className="lwc-signal"><i aria-hidden="true" />{active.signal}</span>
+            </div>
           </div>
           <div className="lwc-pass-scene">
             {PASS_STAGES.map((step, index) => (

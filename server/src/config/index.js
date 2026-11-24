@@ -110,6 +110,17 @@ const config = {
   // (it only ever carries sanitised, name-free ticket data).
   displayToken: process.env.DISPLAY_TOKEN || '',
   groqApiKey: process.env.GROQ_API_KEY || '',
+  // Optional fox voice for the chat mascot. With no key the client falls back to the
+  // browser's own speech synthesis, so the widget keeps working without any billing.
+  elevenLabs: {
+    apiKey: process.env.ELEVENLABS_API_KEY || '',
+    voiceId: process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM',
+    // A library voice is refused with 402 on a free plan; this premade young male voice is
+    // always allowed, so the fox keeps talking until the chosen voice is available.
+    fallbackVoiceId: process.env.ELEVENLABS_FALLBACK_VOICE_ID || 'ErXwobaYiN019PkySvjV',
+    model: process.env.ELEVENLABS_MODEL || 'eleven_flash_v2_5',
+    dailyCharLimit: Number.parseInt(process.env.ELEVENLABS_DAILY_CHAR_LIMIT || '', 10) || 20000,
+  },
 };
 
 export default config;

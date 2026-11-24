@@ -56,6 +56,16 @@ export const chatLimiter = rateLimit({
   message: message('You have asked quite a few questions. Try again a little later.'),
 });
 
+// Speech costs characters on top of the chat reply it reads out, so it gets its own,
+// slightly wider budget rather than doubling the chat limit.
+export const speechLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: message('That is a lot of talking. Give the fox a moment.'),
+});
+
 export const writeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 120,
@@ -63,3 +73,4 @@ export const writeLimiter = rateLimit({
   legacyHeaders: false,
   message: message('Too many changes at once. Please slow down.'),
 });
+
