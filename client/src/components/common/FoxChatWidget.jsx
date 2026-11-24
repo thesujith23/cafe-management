@@ -291,6 +291,14 @@ const FoxChatWidget = () => {
           <i />
           <i />
         </span>
+        <span
+          className="cafe-fox-launcher-felix-tip"
+          id="cafe-fox-launcher-tip"
+          role="tooltip"
+          aria-hidden={open || undefined}
+        >
+          I'm Felix — ask me anything.
+        </span>
       </button>
 
       {(open || closing) && (

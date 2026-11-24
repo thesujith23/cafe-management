@@ -24,6 +24,54 @@
   transition: transform .18s ease, filter .18s ease;
 }
 
+/* A small, non-moving hint on the standing fox: "I'm Felix — ask me anything."
+   It fades in on hover or keyboard focus and disappears when the chat is already
+   open, so the fox never speaks with two voices at once. It stays inside the
+   launcher box, so it never shifts the fox's position. */
+.cafe-fox-launcher-felix-tip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 9px);
+  max-width: 170px;
+  padding: 5px 9px;
+  color: #2f4a3a;
+  background: #fbf7ee;
+  border: 1px solid #e3d8c4;
+  border-radius: 9px;
+  box-shadow: 0 6px 14px rgba(20, 30, 20, .14);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity .16s ease, transform .16s ease;
+  z-index: 5;
+}
+
+.cafe-fox-launcher-felix-tip::after {
+  content: '';
+  position: absolute;
+  right: 11px;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  background: #fbf7ee;
+  border-right: 1px solid #e3d8c4;
+  border-bottom: 1px solid #e3d8c4;
+  transform: rotate(45deg);
+}
+
+.cafe-fox-launcher:hover .cafe-fox-launcher-felix-tip,
+.cafe-fox-launcher:focus-visible .cafe-fox-launcher-felix-tip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cafe-fox-launcher-cart-active .cafe-fox-launcher-felix-tip {
+  bottom: calc(100% + 11px);
+}
+
 .cafe-fox-launcher-fox {
   position: absolute;
   inset: 0;
@@ -392,8 +440,15 @@
   .cafe-fox-icon-button,
   .cafe-fox-stage-fallback,
   .cafe-fox-thought,
-  .cafe-fox-thought i {
+  .cafe-fox-thought i,
+  .cafe-fox-launcher-felix-tip {
     transition: none;
     animation: none;
+  }
+
+  .cafe-fox-launcher:hover .cafe-fox-launcher-felix-tip,
+  .cafe-fox-launcher:focus-visible .cafe-fox-launcher-felix-tip {
+    opacity: 1;
+    transform: none;
   }
 }
