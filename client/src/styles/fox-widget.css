@@ -377,8 +377,14 @@
 
 /* ---------------- small screens ---------------- */
 
-/* Narrow screens cannot hold the 424px offset, so the fox moves to a slim column on the
-   left and the window takes the rest — both stay visible. */
+/* A phone cannot hold the 162px side-by-side offset: squeezing the window into the leftover
+   column left it ~256px wide and 78dvh tall, which read as a long, thin strip nobody could
+   chat in. Below 620px it becomes a compact bottom sheet instead — full width, capped well
+   short of the top, and lifted above the on-screen keyboard.
+
+   `--cafe-fox-vvh` (visible height) and `--cafe-fox-kb` (how much the keyboard covers) are
+   written on the panel by FoxChatWidget from window.visualViewport, so the input row always
+   ends where the keyboard begins instead of sliding underneath it. */
 @media (max-width: 620px) {
   .cafe-fox-launcher {
     left: 10px;
@@ -398,13 +404,52 @@
   }
 
   .cafe-fox-window {
-    right: 10px;
-    bottom: 12px;
-    width: calc(100vw - 134px);
-    height: min(78dvh, calc(100dvh - 24px));
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px) + var(--cafe-fox-kb, 0px));
+    /* Deliberately small: a short panel that leaves the menu visible behind it, and still
+       gives way to the keyboard when it opens. The 260px floor keeps a readable stretch of
+       messages when a keyboard leaves only a few hundred pixels of screen. */
+    height: min(340px, max(260px, calc(var(--cafe-fox-vvh, 100dvh) * .56)), calc(var(--cafe-fox-vvh, 100dvh) - 16px));
     border-radius: 16px;
     /* On phones the fox stands on the left, so the window unfolds from that corner. */
     transform-origin: 0 100%;
+    /* Only the keyboard changes these two, so a short ease hides the jump. */
+    transition: bottom .18s ease, height .18s ease;
+  }
+
+  .cafe-fox-window .cafe-fox-header {
+    padding: 7px 10px;
+  }
+
+  .cafe-fox-window .cafe-fox-body {
+    padding: 9px 10px;
+  }
+
+  .cafe-fox-window .cafe-fox-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cafe-fox-window .cafe-fox-input-row {
+    padding: 8px 10px;
+  }
+
+  /* 16px is the threshold below which iOS Safari zooms the whole page on focus, which is the
+     real reason the layout broke when the keyboard came up. */
+  .cafe-fox-window .chat-input {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .cafe-fox-window .chat-send {
+    width: 44px;
+    height: 44px;
+  }
+
+  .cafe-fox-window .chat-bubble-text {
+    font-size: 14px;
   }
 
   .cafe-fox-launcher-cart-active {
@@ -412,8 +457,8 @@
   }
 
   .cafe-fox-window-cart-active {
-    bottom: 78px;
-    height: min(70dvh, calc(100dvh - 92px));
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px) + var(--cafe-fox-kb, 0px));
+    height: min(300px, max(240px, calc(var(--cafe-fox-vvh, 100dvh) * .5)), calc(var(--cafe-fox-vvh, 100dvh) - 78px));
   }
 }
 
@@ -425,8 +470,17 @@
   }
 
   .cafe-fox-window {
-    right: 8px;
-    width: calc(100vw - 100px);
+    left: 6px;
+    right: 6px;
+  }
+}
+
+/* A tooltip that sticks to the tap target after a tap is noise, so the hover reveal is only
+   wired up on devices that actually hover; touch keeps focus-visible. */
+@media (hover: none) {
+  .cafe-fox-launcher:hover .cafe-fox-launcher-felix-tip {
+    opacity: 0;
+    transform: translateY(4px);
   }
 }
 
@@ -444,6 +498,10 @@
   .cafe-fox-launcher-felix-tip {
     transition: none;
     animation: none;
+  }
+
+  .cafe-fox-window {
+    transition: none;
   }
 
   .cafe-fox-launcher:hover .cafe-fox-launcher-felix-tip,

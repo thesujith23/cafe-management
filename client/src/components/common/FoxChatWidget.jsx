@@ -148,6 +148,7 @@ const FoxChatWidget = () => {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const windowRef = useRef(null);
   const launcherStageRef = useRef(null);
   const { speak, stop: stopSpeech, muted, setMuted, speaking, amplitudeRef } = useFoxSpeech();
 
@@ -167,9 +168,65 @@ const FoxChatWidget = () => {
     return () => window.cancelAnimationFrame(frame);
   }, [messages, sending, open, scrollToLatest]);
 
+  // Autofocus is a desktop courtesy only: on a phone it throws the keyboard up in the
+  // middle of the open animation, so the panel is resized before the guest has seen it.
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (!open) return;
+    const finePointer = window.matchMedia
+      && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (!finePointer) return;
+    inputRef.current?.focus();
   }, [open]);
+
+  // Phones shrink the *visual* viewport when the keyboard opens, and some browsers leave the
+  // layout viewport at full height. Publishing both numbers to the panel lets the CSS keep it
+  // above the keyboard instead of letting the input row slide underneath it.
+  useEffect(() => {
+    if (!open && !closing) return undefined;
+
+    const viewport = window.visualViewport;
+    let frame = 0;
+    let lastHeight = -1;
+
+    const sync = () => {
+      frame = 0;
+      const node = windowRef.current;
+      if (!node) return;
+      const height = viewport ? viewport.height : window.innerHeight;
+      const keyboard = viewport
+        ? Math.max(0, window.innerHeight - (viewport.offsetTop + viewport.height))
+        : 0;
+      const rounded = Math.round(height);
+      node.style.setProperty('--cafe-fox-vvh', `${rounded}px`);
+      node.style.setProperty('--cafe-fox-kb', `${Math.round(keyboard)}px`);
+      // The visible area only changes on keyboard / rotation, so this is the moment to keep
+      // the newest bubble in view — not on every one of iOS' many viewport scroll events.
+      if (rounded !== lastHeight) {
+        lastHeight = rounded;
+        scrollToLatest();
+      }
+    };
+
+    const schedule = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(sync);
+    };
+
+    sync();
+    const target = viewport || window;
+    target.addEventListener('resize', schedule);
+    target.addEventListener('scroll', schedule);
+    window.addEventListener('resize', schedule);
+    window.addEventListener('orientationchange', schedule);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      target.removeEventListener('resize', schedule);
+      target.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('orientationchange', schedule);
+    };
+  }, [open, closing, scrollToLatest]);
 
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current) {
@@ -303,6 +360,7 @@ const FoxChatWidget = () => {
 
       {(open || closing) && (
         <div
+          ref={windowRef}
           className={`cafe-fox-window ${hasCartDock ? 'cafe-fox-window-cart-active' : ''}`}
           role="dialog"
           data-closing={closing ? 'true' : 'false'}
